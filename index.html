@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Updated Title -->
+    <title>Personal Time Tracker V23 - Pro</title> 
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Use Firebase 8.x SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+
+    <!-- Link to external CSS -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Link to external JS, defer ensures it runs after HTML parsing -->
+    <script src="script.js" defer></script>
+
+</head>
+<body class="font-sans"> 
+    
+    <div id="main-app" class="container mx-auto max-w-lg pb-24"> <!-- UPDATED: Increased pb for 5-item nav -->
+        
+        <!-- ===================================================================== -->
+        <!-- PAGE 1: HOME (NEW Dashboard)                                          -->
+        <!-- ===================================================================== -->
+        <div id="home-page" class="page active p-4 space-y-6">
+            <div class="flex justify-between items-center">
+                <h1 class="text-3xl font-bold">Today</h1>
+            </div>
+            
+            <!-- Active Timer Card (Moved) -->
+            <div id="home-timer-card">
+                <div class="flex justify-between items-center">
+                    <div class="flex-grow min-w-0 mr-2"> 
+                        <div class="text-sm opacity-80" id="home-timer-label">Tracking:</div>
+                        <div id="home-timer-activity-name" class="text-xl font-semibold truncate">...</div>
+                    </div>
+                    <button id="home-timer-stop-btn" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold transition">Stop</button>
+                </div>
+                <div id="home-timer-time" class="font-mono text-3xl font-bold text-center mt-4">00:00:00</div>
+            </div>
+
+            <!-- NEW: Home Agenda (Deadlines) -->
+            <div id="home-agenda-list-container">
+                <h3 class="text-xl font-semibold mb-3">Today's Agenda</h3>
+                <div id="home-agenda-list" class="space-y-3">
+                    <!-- Agenda items (deadlines) will be injected here -->
+                </div>
+            </div>
+
+            <!-- NEW: Home Tasks -->
+            <div id="home-tasks-list-container">
+                <h3 class="text-xl font-semibold mb-3">Today's Tasks</h3>
+                <div id="home-tasks-list" class="space-y-3">
+                    <!-- Trackable tasks will be injected here -->
+                </div>
+            </div>
+            
+            <!-- NEW: Home Daily Goals -->
+            <div id="home-daily-goals-list-container">
+                <h3 class="text-xl font-semibold mb-3">Daily Goals</h3>
+                <div id="home-daily-goals-list" class="space-y-3">
+                    <!-- Recurring goals will be injected here -->
+                </div>
+            </div>
+
+            <!-- AI Summary (Unchanged) -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h3 class="text-xl font-semibold mb-2">AI Weekly Summary</h3>
+                <p class="text-sm mb-4" style="color: var(--text-secondary);">Get insights on your productivity from the last 7 days.</p>
+                <div id="ai-summary-content" class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg" style="display: none; color: var(--text-secondary); border: 1px solid var(--border-color);"></div>
+                <button id="generate-ai-summary-btn" class="w-full bg-blue-600 text-white p-3 rounded-lg font-semibold transition mt-4">
+                    Generate Summary
+                </button>
+            </div>
+        </div>
+
+        <!-- ===================================================================== -->
+        <!-- PAGE 2: TRACK (Was Home Page)                                         -->
+        <!-- ===================================================================== -->
+        <div id="track-page" class="page p-4">
+             <div class="flex justify-between items-center mb-6">
+                <h1 class="text-3xl font-bold">Track</h1> 
+            </div>
+            
+            <!-- NEW: Datalist for categories -->
+            <datalist id="category-list-datalist"></datalist>
+
+            <!-- Add Activity Form (Modified) -->
+            <form id="add-activity-form" class="space-y-3 mb-6">
+                <div class="flex gap-2">
+                    <button type="button" id="new-activity-emoji" class="p-3 emoji-input-btn" title="Select Emoji">😀</button>
+                    <input type="hidden" id="new-activity-emoji-value" value="😀">
+                    <input type="text" id="new-activity-name" placeholder="New activity name..." class="flex-grow p-3 focus:outline-none rounded-lg" style="height: 3.5rem;" maxlength="20">
+                    <input type="color" id="new-activity-color" value="#3b82f6" title="Select activity color">
+                </div>
+                <!-- Category & Add Button Row (Modified) -->
+                <div class="flex gap-2">
+                    <input type="text" id="new-activity-category" placeholder="Category (e.g., Work)" class="flex-grow p-3 focus:outline-none rounded-lg" style="height: 3.5rem;" maxlength="20" list="category-list-datalist">
+                    <button id="add-activity-btn" type="submit" class="bg-blue-600 text-white p-3 font-semibold transition rounded-lg" style="height: 3.5rem; min-width: 5rem;">Add</button>
+                </div>
+            </form>
+            
+            <div class="mb-6">
+                <button id="show-manual-entry-btn" class="w-full bg-gray-600 text-white p-3 rounded-lg font-semibold transition shadow-sm">Add Manual Entry</button>
+            </div>
+
+            <!-- Goal View Toggle (Modified) -->
+            <div id="goal-view-toggle" class="tab-container mb-4" style="grid-template-columns: repeat(4, 1fr);">
+                <button class="tab-btn" data-period="daily">Today</button> <!-- UPDATED TEXT -->
+                <button class="tab-btn active" data-period="weekly">Weekly</button>
+                <button class="tab-btn" data-period="monthly">Monthly</button>
+                <button class="tab-btn" data-period="yearly">Yearly</button>
+            </div>
+
+            <!-- NEW: Category Filter -->
+            <div class="mb-4">
+                <label for="category-filter" class="block text-sm font-medium mb-2">Filter by Category:</label>
+                <select id="category-filter" class="w-full p-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" style="height: 3.5rem;">
+                    <option value="all">All Categories</option>
+                    <!-- Categories will be injected here by JS -->
+                </select>
+            </div>
+
+            <h3 class="text-xl font-semibold mb-3">All Activities</h3>
+            <div id="activity-list" class="space-y-3">
+                <!-- Activity list will be injected here -->
+            </div>
+        </div>
+
+        <!-- ===================================================================== -->
+        <!-- PAGE 3: PLANNER (NEW)                                                 -->
+        <!-- ===================================================================== -->
+        <div id="planner-page" class="page p-4">
+            <h1 class="text-3xl font-bold mb-6">Planner</h1>
+
+            <!-- Planner Tabs -->
+            <div id="planner-tab-container" class="tab-container mb-6" style="grid-template-columns: repeat(2, 1fr);">
+                <button class="tab-btn active" data-subpage="tasks">Tasks & Deadlines</button>
+                <button class="tab-btn" data-subpage="goals">Recurring Goals</button>
+            </div>
+
+            <!-- Sub-Page 1: Tasks & Deadlines -->
+            <div id="planner-subpage-tasks" class="sub-page active space-y-6">
+                <!-- Add Planner Item Form -->
+                <form id="add-planner-item-form" class="bg-white p-4 rounded-lg shadow-md space-y-4">
+                    <h3 class="text-xl font-semibold">Add New Item</h3>
+                    
+                    <div>
+                        <label for="planner-item-type" class="block text-sm font-medium mb-2">Item Type</label>
+                        <select id="planner-item-type" class="w-full p-3 border rounded-lg shadow-sm">
+                            <option value="task">One-off Task (Trackable)</option>
+                            <option value="deadline">Deadline (Not Trackable)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="planner-item-name" class="block text-sm font-medium mb-2">Name</label>
+                        <input type="text" id="planner-item-name" placeholder="E.g., Finish report" class="w-full" maxlength="40">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="planner-item-due-date" class="block text-sm font-medium mb-2">Due Date</label>
+                            <input type="date" id="planner-item-due-date" class="w-full">
+                        </div>
+                        <div id="planner-target-hours-group">
+                            <label for="planner-item-target-hours" class="block text-sm font-medium mb-2">Target (Hours)</label>
+                            <input type="number" id="planner-item-target-hours" min="0" step="0.5" placeholder="E.g., 4" class="w-full">
+                        </div>
+                    </div>
+                    
+                    <button id="add-planner-item-btn" type="submit" class="w-full bg-blue-600 text-white p-3 font-semibold transition rounded-lg">Add to Planner</button>
+                </form>
+
+                <!-- Planner Item List -->
+                <div id="planner-item-list-container">
+                    <!-- Items will be sorted and injected here by JS -->
+                    <h2 class="category-header">Overdue</h2>
+                    <div id="planner-list-overdue" class="space-y-3 mb-4"></div>
+                    
+                    <h2 class="category-header">Today</h2>
+                    <div id="planner-list-today" class="space-y-3 mb-4"></div>
+                    
+                    <h2 class="category-header">Upcoming</h2>
+                    <div id="planner-list-upcoming" class="space-y-3 mb-4"></div>
+
+                    <h2 class="category-header">Completed</h2>
+                    <div id="planner-list-completed" class="space-y-3"></div>
+                </div>
+            </div>
+
+            <!-- Sub-Page 2: Recurring Goals -->
+            <div id="planner-subpage-goals" class="sub-page space-y-6">
+                <div class="bg-white p-4 rounded-lg shadow-md">
+                    <p class="text-sm" style="color: var(--text-secondary);">
+                        Recurring goals are set on your main activities. Go to the 
+                        <button class="text-blue-600 font-medium" onclick="showPage('track')">Track</button> 
+                        page and edit an activity to set a daily, weekly, or monthly goal.
+                    </p>
+                </div>
+                <div id="planner-recurring-goals-list" class="space-y-3">
+                    <!-- Recurring goals list will be injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ===================================================================== -->
+        <!-- PAGE 4: ANALYSIS                                                        -->
+        <!-- ===================================================================== -->
+        <div id="analysis-page" class="page p-4 view-daily">
+            <h1 class="text-3xl font-bold mb-6">Analysis</h1>
+            <div class="mb-6">
+                <label for="analysis-date" class="block text-sm font-medium mb-1">Select Date:</label>
+                <input type="date" id="analysis-date" class="w-full p-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                
+                <div id="analysis-date-navigator">
+                    <button id="analysis-nav-prev" title="Previous period">&larr;</button>
+                    <span id="analysis-nav-text" class="text-center font-semibold"></span>
+                    <button id="analysis-nav-next" title="Next period">&rarr;</button>
+                </div>
+            </div>
+             <div id="analysis-tab-container" class="tab-container mb-6"> 
+                <button class="analysis-tab-btn tab-btn active py-2 px-4 rounded-lg font-semibold transition" data-view="daily">Daily</button>
+                <button class="analysis-tab-btn tab-btn py-2 px-4 rounded-lg font-semibold transition" data-view="weekly">Weekly</button>
+                <button class="analysis-tab-btn tab-btn py-2 px-4 rounded-lg font-semibold transition" data-view="monthly">Monthly</button>
+            </div>
+
+            <div id="ranking-card" class="bg-white p-6 rounded-lg shadow-md mb-6"> 
+                <h2 id="ranking-title" class="text-2xl font-semibold mb-4">Ranking</h2>
+                <div id="ranking-list" class="space-y-4"></div>
+                
+                <button id="view-all-logs-btn" class="w-full bg-blue-600 text-white p-3 rounded-lg font-semibold transition shadow-sm mt-6">View & Edit Logs</button>
+                <button id="export-csv-btn" class="w-full bg-gray-300 px-4 py-2 rounded-lg font-semibold transition mt-3">
+                    <svg class="w-5 h-5 inline-block mr-2 -mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Export as CSV
+                </button>
+            </div>
+
+            <div id="analysis-filter-container" class="mb-4" style="display: none;">
+                <label for="analysis-activity-filter" class="block text-sm font-medium mb-1">Filter Activity:</label>
+                <select id="analysis-activity-filter" class="w-full p-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="all">All Activities</option>
+                </select>
+            </div>
+            
+            <div id="heatmap-card" class="bg-white p-6 rounded-lg shadow-md mb-6" style="display: none;">
+                <h3 class="text-xl font-semibold mb-4" id="heatmap-title">Monthly Activity</h3>
+                <div id="heatmap-weekdays">
+                    <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+                </div>
+                <div id="heatmap-grid">
+                    </div>
+            </div>
+
+            <div id="bar-chart-card" class="bg-white p-6 rounded-lg shadow-md mb-6"> 
+                <h3 class="text-xl font-semibold mb-4" id="bar-chart-title">Time Breakdown (Bar)</h3>
+                <div id="bar-chart-container" style="height: 250px;"><canvas id="analysis-bar-chart"></canvas></div>
+            </div>
+            <div id="pie-chart-card" class="bg-white p-6 rounded-lg shadow-md mb-6"> 
+                <h3 class="text-xl font-semibold mb-4">Time Breakdown (Pie)</h3>
+                <div id="pie-chart-container" class="max-w-xs mx-auto" style="height: 250px;"><canvas id="analysis-pie-chart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- ===================================================================== -->
+        <!-- PAGE 5: SETTINGS (Was Page 4)                                         -->
+        <!-- ===================================================================== -->
+        <div id="settings-page" class="page p-4">
+            <h1 class="text-3xl font-bold mb-6">Settings</h1>
+
+            <!-- Account Card -->
+            <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                <h3 class="text-xl font-semibold mb-2">Account</h3>
+                <p class="text-sm mb-4" style="color: var(--text-secondary);">Sign in to back up and sync your data across devices.</p>
+                <div id="user-info" class="mb-4" style="display: none;">
+                    <p class="text-sm font-medium" style="color: var(--text-primary);">Signed in as:</p>
+                    <p id="user-email" class="text-sm" style="color: var(--text-secondary);"></p>
+                </div>
+                <button id="sign-in-btn" class="w-full bg-blue-600 text-white p-3 rounded-lg font-semibold transition">
+                    <svg class="w-5 h-5 inline-block mr-2 -mt-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.2 0 5.8 1.2 7.8 3.1l5.8-5.8C34.5 3.1 29.8 1 24 1 14.9 1 7.2 6.6 3.9 14.5l6.9 5.3C12.4 12.8 17.8 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.2 24.5c0-1.5-.1-2.9-.4-4.3H24v8.3h12.5c-.6 2.7-2.3 5-4.8 6.6l6.4 4.9c3.8-3.5 6-8.8 6-15.5z"></path><path fill="#FBBC05" d="M10.8 28.7c-.7-2.1-.7-4.4 0-6.5l-6.9-5.3C1.4 20.6 0 25.1 0 30c0 4.9 1.4 9.4 3.9 13.1l6.9-5.3c-.7-2.1-.7-4.4 0-6.5z"></path><path fill="#34A853" d="M24 47c5.8 0 10.7-1.9 14.2-5.2l-6.4-4.9c-1.9 1.3-4.4 2.1-7.8 2.1-6.2 0-11.6-3.3-13.7-8.1l-6.9 5.3C7.2 40.4 14.9 47 24 47z"></path><path fill="none" d="M0 0h48v48H0z"></path></svg>
+                    Sign In with Google
+                </button>
+                <button id="sign-out-btn" class="w-full bg-red-600 text-white p-3 rounded-lg font-semibold transition" style="display: none;">Sign Out</button>
+            </div>
+
+            <!-- Appearance Card -->
+            <div class="bg-white p-6 rounded-lg shadow-md mb-6 space-y-6">
+                <h3 class="text-xl font-semibold">Appearance</h3>
+                
+                <div class="flex justify-between items-center">
+                    <label class="font-medium" style="color: var(--text-primary);">Dark Theme</label>
+                    <button id="theme-toggle-btn-settings" class="p-2 rounded-full transition">
+                        <svg id="theme-icon-light-settings" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                        <svg id="theme-icon-dark-settings" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                    </button>
+                </div>
+
+                <div class="flex flex-col">
+                    <label for="font-size-slider" class="font-medium mb-3" style="color: var(--text-primary);">Font Size</label>
+                    <input type="range" id="font-size-slider" min="0" max="4" value="2" class="w-full">
+                    <div class="flex justify-between text-xs mt-2" style="color: var(--text-muted);">
+                        <span>S</span>
+                        <span>M</span>
+                        <span>L</span>
+                        <span>XL</span>
+                        <span>XXL</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Global Settings Card (DELETED) -->
+
+        </div>
+    </div>
+
+    <!-- Flip Clock Page (No changes) -->
+    <div id="flip-clock-page">
+        <button id="flip-clock-back-btn">&larr;</button>
+        <div id="flip-clock-activity">...</div>
+        
+        <div id="flip-clock-time" class="flip-clock-container">
+            <div class="flip-card-block">
+                <div class="digit-group" data-group="hours">
+                    <div class="digit" data-digit="h1"><div class="card-top"><span>0</span></div><div class="card-bottom"><span>0</span></div><div class="card-flip"><div class="flip-top"><span>0</span></div><div class="flip-bottom"><span>0</span></div></div></div>
+                    <div class="digit" data-digit="h2"><div class="card-top"><span>0</span></div><div class="card-bottom"><span>0</span></div><div class="card-flip"><div class="flip-top"><span>0</span></div><div class="flip-bottom"><span>0</span></div></div></div>
+                </div>
+            </div>
+            <div class="flip-card-block">
+                <div class="digit-group" data-group="minutes">
+                    <div class="digit" data-digit="m1"><div class="card-top"><span>0</span></div><div class="card-bottom"><span>0</span></div><div class="card-flip"><div class="flip-top"><span>0</span></div><div class="flip-bottom"><span>0</span></div></div></div>
+                    <div class="digit" data-digit="m2"><div class="card-top"><span>0</span></div><div class="card-bottom"><span>0</span></div><div class="card-flip"><div class="flip-top"><span>0</span></div><div class="flip-bottom"><span>0</span></div></div></div>
+                </div>
+                <div class="digit-group-seconds" data-group="seconds">
+                    <div class="digit" data-digit="s1"><div class="card-top"><span>0</span></div><div class="card-bottom"><span>0</span></div><div class="card-flip"><div class="flip-top"><span>0</span></div><div class="flip-bottom"><span>0</span></div></div></div>
+                    <div class="digit" data-digit="s2"><div class="card-top"><span>0</span></div><div class="card-bottom"><span>0</span></div><div class="card-flip"><div class="flip-top"><span>0</span></div><div class="flip-bottom"><span>0</span></div></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Timer Banner (No changes) -->
+    <div id="timer-banner" class="fixed top-0 left-0 right-0 text-white p-4 shadow-lg m-4 rounded-lg z-50 cursor-pointer">
+        <div class="container mx-auto max-w-lg flex justify-between items-center">
+            <div class="flex-grow min-w-0 mr-2"> 
+                <div class="text-sm opacity-80">Tracking:</div>
+                <div id="banner-activity-name" class="font-semibold truncate">...</div>
+            </div>
+            <div id="banner-time" class="font-mono text-lg font-bold mr-3">00:00:00</div>
+            <button id="banner-stop-btn" title="Stop Timer">
+                <svg class="w-5 h-5 pointer-events-none text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-11a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1zm4 0a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODALS                                                                  -->
+    <!-- ===================================================================== -->
+    
+    <!-- Stop Note Modal (No changes) -->
+    <div id="stop-note-modal" class="modal fixed inset-0 z-50 items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
+            <h3 class="text-xl font-bold mb-4">Log Entry</h3>
+            <p class="text-sm mb-4" style="color: var(--text-secondary);">Timer stopped. Add an optional note for this entry?</p>
+            <form id="stop-note-form">
+                <textarea id="stop-note-input" rows="3" placeholder="E.g., Finished Chapter 2, Client call..." class="mt-1 block w-full p-3 border rounded-lg shadow-sm"></textarea>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" id="skip-stop-note-btn" class="bg-gray-300 px-4 py-2 rounded-lg font-semibold transition">Skip</button>
+                    <button type="submit" id="save-stop-note-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold transition">Save Log</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Modal (No changes) -->
+    <div id="delete-modal" class="modal fixed inset-0 z-50 items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full"><h3 class="text-xl font-bold mb-4">Confirm Deletion</h3><p id="delete-modal-text" class="mb-6"></p><div class="flex justify-end space-x-3"><button id="cancel-delete-btn" class="bg-gray-300 px-4 py-2 rounded-lg font-semibold transition">Cancel</button><button id="confirm-delete-btn" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold transition">Delete</button></div></div>
+    </div>
+    
+    <!-- Manual Entry Modal (No changes) -->
+    <div id="manual-entry-modal" class="modal fixed inset-0 z-50 items-center justify-center p-4 overflow-y-auto"><div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mt-20"><h3 class="text-xl font-bold mb-6">Add Manual Time Entry</h3><form id="manual-entry-form" class="space-y-4"><div><label for="manual-activity-select" class="block text-sm font-medium">Activity</label><select id="manual-activity-select" class="mt-1 block w-full p-3 border rounded-lg shadow-sm"></select></div><div><label for="manual-date" class="block text-sm font-medium">Date</label><input type="date" id="manual-date" class="mt-1 block w-full p-3 border rounded-lg shadow-sm"></div><div class="grid grid-cols-2 gap-4"><div><label for="manual-start-time" class="block text-sm font-medium">Start Time</label><input type="time" id="manual-start-time" class="mt-1 block w-full p-3 border rounded-lg shadow-sm"></div><div><label for="manual-end-time" class="block text-sm font-medium">End Time</label><input type="time" id="manual-end-time" class="mt-1 block w-full p-3 border rounded-lg shadow-sm"></div></div><div><label for="manual-notes" class="block text-sm font-medium">Notes (Optional)</label><textarea id="manual-notes" rows="3" class="mt-1 block w-full p-3 border rounded-lg shadow-sm"></textarea></div><div class="flex justify-end space-x-3 pt-4"><button type="button" id="cancel-manual-entry-btn" class="bg-gray-300 px-4 py-2 rounded-lg font-semibold transition">Cancel</button><button type="submit" id="save-manual-entry-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold transition">Save</button></div></form></div></div>
+    
+    <!-- Edit Log Modal (No changes) -->
+    <div id="edit-log-modal" class="modal fixed inset-0 z-50 items-center justify-center p-4 overflow-y-auto"><div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mt-20"><h3 class="text-xl font-bold mb-6">Edit Time Log</h3><form id="edit-log-form" class="space-y-4"><input type="hidden" id="edit-log-id"><div><label for="edit-activity-name" class="block text-sm font-medium">Activity</label><input type="text" id="edit-activity-name" class="mt-1 block w-full p-3 border rounded-lg bg-gray-100 dark:bg-gray-700" readonly></div><div><label for="edit-date" class="block text-sm font-medium">Date</label><input type="date" id="edit-date" class="mt-1 block w-full p-3 border rounded-lg shadow-sm"></div><div class="grid grid-cols-2 gap-4"><div><label for="edit-start-time" class="block text-sm font-medium">Start Time</label><input type="time" id="edit-start-time" class="mt-1 block w-full p-3 border rounded-lg shadow-sm"></div><div><label for="edit-end-time" class="block text-sm font-medium">End Time</label><input type="time" id="edit-end-time" class="mt-1 block w-full p-3 border rounded-lg shadow-sm"></div></div><div><label for="edit-notes" class="block text-sm font-medium">Notes (Optional)</label><textarea id="edit-notes" rows="3" class="mt-1 block w-full p-3 border rounded-lg shadow-sm"></textarea></div><div class="flex justify-end space-x-3 pt-4"><button type="button" id="cancel-edit-log-btn" class="bg-gray-300 px-4 py-2 rounded-lg font-semibold transition">Cancel</button><button type="submit" id="save-edit-log-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold transition">Save Changes</button></div></form></div></div>
+    
+    <!-- ======================================================== -->
+    <!-- Edit Activity Modal (HEAVILY UPDATED)                    -->
+    <!-- ======================================================== -->
+    <div id="edit-activity-modal" class="modal fixed inset-0 z-50 items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
+            <h3 class="text-xl font-bold mb-6">Edit Activity</h3>
+            <form id="edit-activity-form" class="space-y-4">
+                <input type="hidden" id="edit-activity-id">
+                
+                <!-- Symmetrical layout -->
+                <div>
+                    <label class="block text-sm font-medium mb-2">Activity</label>
+                    <div class="flex gap-2">
+                        <button type="button" id="edit-activity-emoji-input" class="emoji-input-btn" title="Select Emoji">😀</button>
+                        <input type="hidden" id="edit-activity-emoji-value" value="😀">
+                        <input type="text" id="edit-activity-name-input" placeholder="Activity name..." class="flex-grow p-3 focus:outline-none rounded-lg" title="Activity Name" maxlength="20">
+                        <input type="color" id="edit-activity-color-input" title="Select activity color">
+                    </div>
+                </div>
+
+                <!-- Category -->
+                <div>
+                    <label for="edit-activity-category" class="block text-sm font-medium">Category</label>
+                    <input type="text" id="edit-activity-category" placeholder="E.g., Work, Uni, Personal" class="mt-1 block w-full p-3 border rounded-lg shadow-sm" maxlength="20" list="category-list-datalist">
+                </div>
+                
+                <!-- Expanded Goals -->
+                <div>
+                    <label class="block text-sm font-medium">Goal</label>
+                    <div class="flex gap-2 mt-1">
+                        <input type="number" id="edit-activity-goal-value" min="0" step="0.5" placeholder="E.g., 5" class="w-1/2 p-3 border rounded-lg shadow-sm">
+                        <select id="edit-activity-goal-period" class="w-1/2 p-3 border rounded-lg shadow-sm">
+                            <option value="none">None</option>
+                            <option value="daily">per Day</option>
+                            <option value="weekly">per Week</option>
+                            <option value="monthly">per Month</option>
+                            <option value="yearly">per Year</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Pin Toggle (Unchanged) -->
+                <div class="flex justify-between items-center pt-2">
+                    <label for="edit-activity-pin" class="block text-sm font-medium">Pin to Quick Start</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="edit-activity-pin">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <!-- Button layout -->
+                <div class="flex justify-between items-center pt-4 mt-4 border-t" style="border-color: var(--border-color);">
+                    <button type="button" id="delete-activity-from-modal-btn" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold transition">Delete</button>
+                    
+                    <div class="flex space-x-3">
+                        <button type="button" id="cancel-edit-activity-btn" class="bg-gray-300 px-4 py-2 rounded-lg font-semibold transition">Cancel</button>
+                        <button type="submit" id="save-edit-activity-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold transition">Save</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Log Details Modal (No changes) -->
+    <div id="log-details-modal" class="modal fixed inset-0 z-50 items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mt-20">
+            <h3 class="text-xl font-bold mb-6">Time Logs</h3>
+            <div id="log-details-list" class="space-y-3 max-h-80 overflow-y-auto mb-6">
+                <!-- Log items will be injected here -->
+            </div>
+            <div class="flex justify-end">
+                <button type="button" id="close-log-details-btn" class="bg-gray-300 px-4 py-2 rounded-lg font-semibold transition">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Emoji Picker Modal (No changes) -->
+    <div id="emoji-modal" class="modal fixed inset-0 z-50 items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-xl w-full">
+            <h3 class="text-xl font-bold mb-4">Select an Emoji</h3>
+            <div id="emoji-grid" class="emoji-grid">
+            </div>
+            <div id="emoji-categories" class="flex flex-wrap justify-center gap-2 border-t pt-3 mt-3" style="border-color: var(--border-color);">
+            </div>
+            <div class="flex justify-end mt-4">
+                <button type="button" id="close-emoji-modal-btn" class="bg-gray-300 px-4 py-2 rounded-lg font-semibold transition">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- NAVIGATION (UPDATED with 5 tabs)                                        -->
+    <!-- ===================================================================== -->
+    <nav class="fixed bottom-0 left-0 right-0 border-t shadow-lg">
+        <div class="container mx-auto max-w-lg flex justify-around">
+            <!-- Tab 1: Home (NEW) -->
+            <button class="nav-btn active-nav flex-1 flex flex-col items-center p-3" data-page="home">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10 0h3a1 1 0 001-1V10M5 10l7-7 7 7"></path></svg>
+                <span class="text-xs">Home</span>
+            </button>
+            
+            <!-- Tab 2: Track -->
+            <button class="nav-btn flex-1 flex flex-col items-center p-3" data-page="track">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+                <span class="text-xs">Track</span>
+            </button>
+
+            <!-- Tab 3: Planner (NEW) -->
+            <button class="nav-btn flex-1 flex flex-col items-center p-3" data-page="planner">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                <span class="text-xs">Planner</span>
+            </button>
+
+            <!-- Tab 4: Analysis -->
+            <button class="nav-btn flex-1 flex flex-col items-center p-3" data-page="analysis">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                <span class="text-xs">Analysis</span>
+            </button>
+
+            <!-- Tab 5: Settings -->
+            <button class="nav-btn flex-1 flex flex-col items-center p-3" data-page="settings">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826 3.31 2.37-2.37a1.724 1.724 0 002.573-1.066zM15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                <span class="text-xs">Settings</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- JavaScript is now linked in the <head> with defer -->
+
+</body>
+</html>
