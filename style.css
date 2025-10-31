@@ -41,6 +41,9 @@ html {
     --heatmap-2: #99c2ff;
     --heatmap-3: #4d94ff;
     --heatmap-4: #1a73e8;
+    
+    --success-color-rgb: 25, 135, 84;
+    --danger-color-rgb: 220, 53, 69;
 }
 .dark-theme {
     --bg-primary: #1f1f1f; --bg-secondary: #2a2a2a; --bg-input: #343434; 
@@ -65,6 +68,9 @@ html {
     --heatmap-2: #1e4f88;
     --heatmap-3: #3b78cf;
     --heatmap-4: #8ab4f8;
+    
+    --success-color-rgb: 64, 192, 87;
+    --danger-color-rgb: 240, 101, 113;
 }
 
 #flip-clock-page { 
@@ -274,7 +280,7 @@ body {
     transition: background-color 0.2s ease, color 0.2s ease;
     font-size: 1rem; /* Base font size */
 }
-#home-page, #track-page, #analysis-page, #settings-page, #planner-page { color: var(--text-primary); } /* UPDATED: Added planner-page */
+#home-page, #track-page, #analysis-page, #settings-page { color: var(--text-primary); } /* UPDATED: Removed planner-page */
 h1, h2, h3 { color: var(--text-primary); font-weight: 600; } 
 p, label { color: var(--text-secondary); line-height: 1.6; } 
 span.text-gray-600 { color: var(--text-secondary); } 
@@ -299,7 +305,6 @@ textarea { height: auto; } /* Allow textarea to be different height */
 
 #home-page div.bg-white, /* UPDATED: Home page cards */
 #track-page div.bg-white, /* UPDATED: Track page cards */
-#planner-page div.bg-white, /* UPDATED: Planner page cards */
 #analysis-page #ranking-card, 
 #analysis-page #bar-chart-card, 
 #analysis-page #pie-chart-card,
@@ -317,7 +322,6 @@ textarea { height: auto; } /* Allow textarea to be different height */
 #settings-page div.bg-white h3,
 #home-page div.bg-white h3, /* UPDATED */
 #track-page div.bg-white h3, /* UPDATED */
-#planner-page div.bg-white h3, /* UPDATED */
 #home-page #home-agenda-list-container h3, /* NEW */
 #home-page #home-tasks-list-container h3, /* NEW */
 #home-page #home-daily-goals-list-container h3 { /* NEW */
@@ -534,7 +538,7 @@ nav.fixed.bottom-0 {
     transition: background-color 0.2s ease; 
 }
 .item-list-item:hover { background-color: rgba(var(--link-rgb), 0.05); }
-/* .item-list-item .btn-edit-activity { } <-- DELETED EMPTY RULESET */
+
 
 #analysis-date-navigator {
     display: none; 
@@ -614,10 +618,98 @@ button:active { transform: scale(0.96); opacity: 0.9; }
 #stop-note-modal { z-index: 55; }
 .modal.active { opacity: 1; pointer-events: auto; }
 .modal > div {
-    transition: opacity 0.05s ease-out; 
+    transition: opacity 0.05s ease-out, transform 0.2s ease-out; /* UPDATED: Added transform */
     opacity: 0;
 }
 .modal.active > div { opacity: 1; }
+
+/* NEW: Bottom Sheet Modal Styles */
+#add-item-modal, #time-range-modal {
+    align-items: flex-end; /* Align to bottom */
+}
+#add-item-modal > div, #time-range-modal > div {
+    transform: translateY(100%);
+}
+#add-item-modal.active > div, #time-range-modal.active > div {
+    transform: translateY(0);
+}
+
+/* NEW: Full Screen Modal Styles */
+#filter-modal {
+    align-items: flex-start;
+    justify-content: center;
+}
+#filter-modal > div {
+    transform: translateY(-50px);
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    max-width: 100%;
+}
+#filter-modal.active > div {
+    transform: translateY(0);
+}
+
+/* NEW: Filter Button Styles */
+.filter-toggle-btn {
+    background-color: var(--bg-button-secondary);
+    color: var(--text-button-secondary);
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+.filter-toggle-btn.active {
+    background-color: var(--link-color);
+    color: var(--link-text);
+}
+.filter-toggle-btn .check-icon {
+    display: none;
+    width: 1.25rem; /* w-5 */
+    height: 1.25rem; /* h-5 */
+}
+.filter-toggle-btn.active .check-icon {
+    display: inline-block;
+}
+
+#filter-tab-activities, #filter-tab-categories {
+    border-color: transparent; /* Default */
+    color: var(--text-muted);
+}
+#filter-tab-activities.active, #filter-tab-categories.active {
+    color: var(--link-color);
+    border-color: var(--link-color);
+}
+
+.filter-list-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+}
+.filter-list-item:hover {
+    background-color: var(--bg-accent);
+}
+.filter-list-item input[type="checkbox"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-right: 0.75rem;
+    border-radius: 0.25rem;
+    border-color: var(--border-color);
+}
+.filter-list-item input[type="checkbox"]:checked {
+    background-color: var(--link-color);
+    border-color: var(--link-color);
+}
+.filter-list-item label {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
 
 @keyframes fadeIn { 
     from { opacity: 0; transform: translateY(5px); } 
@@ -666,204 +758,206 @@ button:active { transform: scale(0.96); opacity: 0.9; }
     opacity: 0; transform: scale(0.9); pointer-events: none;
 }
 
-#quick-start-container {
-    display: flex;
-    overflow-x: auto;
-    padding-bottom: 0.75rem; /* For scrollbar */
-    gap: 0.75rem;
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
-}
-#quick-start-container::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
-}
-.quick-start-btn {
-    flex: 0 0 auto; /* Don't shrink, don't grow */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 8rem;
-    height: 6rem;
-    padding: 0.75rem;
-    border-radius: 0.75rem; /* UPDATED: Match cards */
-    background-color: var(--item-bg);
-    border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-sm);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-.quick-start-btn:hover {
-    background-color: var(--bg-accent-hover);
-    transform: translateY(-2px);
-}
-.quick-start-btn.disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    background-color: var(--bg-button-secondary);
-}
-.quick-start-btn .emoji {
-    font-size: 1.75rem;
-    margin-bottom: 0.5rem;
-}
-.quick-start-btn .name {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--item-text-primary);
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    width: 100%;
-}
+/* DELETED old .quick-start-container styles */
+/* DELETED old .progress-circle styles */
 
-/* NEW: Daily Goal Progress Circle */
-.progress-circle {
-    width: 150px;
-    height: 150px;
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    background: conic-gradient(var(--link-color) 0deg, var(--bg-button-secondary) 0deg);
-    transition: background 0.3s ease-out;
-}
-.progress-circle-inner {
-    width: 120px;
-    height: 120px;
-    border-radius: 50%;
-    background: var(--item-bg);
+/* NEW: Track Page List View Styles */
+.track-list-header {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 0.5rem;
+    border-bottom: 2px solid var(--border-color);
+    margin-top: 1.5rem;
 }
-#daily-goal-hours {
-    font-size: 2.25rem;
+.track-list-header-date .day {
+    font-size: 2.25rem; /* 36px */
     font-weight: 700;
-    color: var(--text-primary);
     line-height: 1;
+    color: var(--text-primary);
 }
-#daily-goal-text {
-    font-size: 0.875rem;
+.track-list-header-date .weekday {
+    font-size: 1rem;
     font-weight: 500;
     color: var(--text-secondary);
 }
-#daily-goal-set-btn {
-    font-size: 0.875rem;
+.track-list-header-date .month-year {
+    font-size: 1rem;
     font-weight: 500;
-    color: var(--link-color);
-    cursor: pointer;
+    color: var(--text-secondary);
 }
-#daily-goal-set-btn:hover {
-    text-decoration: underline;
+.track-list-header-totals {
+    text-align: right;
 }
-
-/* NEW: Home Active Timer Card */
-#home-timer-card {
-    display: none;
-    background-color: var(--link-color);
-    color: var(--link-text);
-    padding: 1.5rem;
-    border-radius: 0.75rem;
-    box-shadow: var(--shadow-lg);
+.track-list-header-totals .total-tracked,
+.track-list-header-totals .total-goal {
+    font-size: 0.875rem; /* 14px */
+    font-weight: 500;
+    color: var(--text-secondary);
 }
-#home-timer-card.active {
-    display: block;
-    animation: popIn 0.3s ease-out;
+.track-list-header-totals .total-tracked span,
+.track-list-header-totals .total-goal span {
+    font-weight: 700;
+    color: var(--text-primary);
 }
 
-/* --- NEW PLANNER STYLES --- */
-.planner-item {
+.track-item {
     display: flex;
-    align-items: center;
-    gap: 0.75rem; /* 12px */
     background-color: var(--item-bg);
-    padding: 0.75rem;
     border-radius: 0.75rem;
     border: 1px solid var(--border-color);
-    transition: background-color 0.2s ease;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
 }
-.planner-item:hover {
-    background-color: var(--bg-accent);
-}
-
-.planner-item.completed {
+.track-item.completed {
     opacity: 0.6;
 }
-.planner-item.completed .planner-item-name {
+.track-item.completed .track-item-main-name,
+.track-item.completed .track-item-main-category {
     text-decoration: line-through;
 }
 
-.planner-item-checkbox {
-    width: 1.5rem; /* 24px */
-    height: 1.5rem;
+.track-item-emoji {
     flex-shrink: 0;
-    border: 2px solid var(--border-color);
-    border-radius: 0.375rem; /* 6px */
-    cursor: pointer;
-    transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-.planner-item-checkbox:checked {
-    background-color: var(--link-color);
-    border-color: var(--link-color);
+    width: 4.5rem; /* 72px */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem; /* 32px */
 }
 
-.planner-item-name-wrapper {
+.track-item-content {
     flex-grow: 1;
-    min-width: 0; /* Important for ellipsis */
+    display: flex;
+    flex-direction: column;
+    padding: 0.75rem 0; /* 12px top/bottom */
+    min-width: 0; /* For ellipsis */
 }
-.planner-item-name {
-    font-weight: 500;
-    color: var(--item-text-primary);
-    /* truncate: true; <-- DELETED BAD PROPERTY */
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+
+.track-item-main {
+    flex-grow: 1;
 }
-.planner-item-subtext {
-    font-size: 0.875rem; /* text-sm */
-    color: var(--text-secondary);
-}
-.planner-item-due-date {
+.track-item-main-category {
     font-size: 0.875rem;
     font-weight: 500;
     color: var(--text-secondary);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
-.planner-item-due-date.overdue {
-    color: var(--danger-color);
+.track-item-main-name {
+    font-size: 1.125rem; /* 18px */
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.track-item-main-notes {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-top: 2px;
 }
 
-.planner-item-actions {
-    display: flex;
-    flex-shrink: 0;
+.track-item-progress-bar {
+    height: 6px;
+    background-color: var(--bg-button-secondary);
+    border-radius: 3px;
+    margin-top: 0.5rem; /* 8px */
+    overflow: hidden;
+    width: 100%;
 }
-/* Basic button styling for planner item actions */
-.planner-item-actions button {
-    padding: 0.5rem;
-    border-radius: 9999px; /* rounded-full */
+.track-item-progress-fill {
+    height: 100%;
+    background-color: var(--link-color);
+    border-radius: 3px;
+    transition: width 0.3s ease-out;
+}
+
+.track-item-details {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem; /* 12px */
+    color: var(--text-muted);
+    margin-top: 0.5rem; /* 8px */
+}
+.track-item-due-date.overdue {
+    color: var(--danger-color);
+    font-weight: 600;
+}
+
+.track-item-action-box {
+    flex-shrink: 0;
+    width: 5rem; /* 80px */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border-color);
+    background-color: var(--bg-primary);
+}
+.track-item-action-box button {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
     transition: background-color 0.2s ease;
 }
-.planner-item-actions button.btn-start-task {
+.track-item-action-box button.action-start {
     color: var(--success-color);
 }
-.planner-item-actions button.btn-start-task:hover {
-    background-color: rgba(var(--success-color-rgb), 0.1); /* Needs --success-color-rgb defined */
+.track-item-action-box button.action-start:hover {
+    background-color: rgba(var(--success-color-rgb), 0.1);
 }
-.planner-item-actions button.btn-delete-item {
-    color: var(--danger-color);
+.track-item-action-box button.action-stop {
+    background-color: var(--danger-color);
+    color: var(--danger-text);
 }
-.planner-item-actions button.btn-delete-item:hover {
-    background-color: rgba(var(--danger-color-rgb), 0.1); /* Needs --danger-color-rgb defined */
+.track-item-action-box button.action-stop:hover {
+    background-color: var(--danger-hover-color);
+}
+.track-item-action-box button.action-done {
+    color: var(--link-color);
+}
+.track-item-action-box button.action-done:hover {
+    background-color: rgba(var(--link-rgb), 0.1);
+}
+.track-item-action-box button svg {
+    width: 1.75rem; /* 28px */
+    height: 1.75rem;
+}
+.track-item-action-box button .timer {
+    font-family: 'monospace', 'Courier New', Courier;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.2;
 }
 
-/* --- FIX for missing color-rgb vars --- */
-:root {
-    --success-color-rgb: 25, 135, 84;
-    --danger-color-rgb: 220, 53, 69;
+/* NEW: Grid View */
+#track-content-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
 }
-.dark-theme {
-    --success-color-rgb: 64, 192, 87;
-    --danger-color-rgb: 240, 101, 113;
+.track-grid-day {
+    aspect-ratio: 1 / 1;
+    width: 100%;
+    border-radius: 3px;
+    background-color: var(--heatmap-0);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
+.track-grid-day:hover {
+    transform: scale(1.1);
+    box-shadow: var(--shadow-md);
+}
+.track-grid-day[data-level="1"] { background-color: var(--heatmap-1); }
+.track-grid-day[data-level="2"] { background-color: var(--heatmap-2); }
+.track-grid-day[data-level="3"] { background-color: var(--heatmap-3); }
+.track-grid-day[data-level="4"] { background-color: var(--heatmap-4); }
 
