@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Updated Title -->
-    <title>Personal Time Tracker V23 - Pro</title> 
+    <title>Personal Time Tracker V24 - Planner</title> 
     
     <script src="https://cdn.tailwindcss.com"></script>
 
@@ -24,17 +23,17 @@
 </head>
 <body class="font-sans"> 
     
-    <div id="main-app" class="container mx-auto max-w-lg pb-24"> <!-- UPDATED: Increased pb for 5-item nav -->
+    <div id="main-app" class="container mx-auto max-w-lg pb-24">
         
         <!-- ===================================================================== -->
-        <!-- PAGE 1: HOME (NEW Dashboard)                                          -->
+        <!-- PAGE 1: HOME (Simplified Dashboard)                                   -->
         <!-- ===================================================================== -->
         <div id="home-page" class="page active p-4 space-y-6">
             <div class="flex justify-between items-center">
                 <h1 class="text-3xl font-bold">Today</h1>
             </div>
             
-            <!-- Active Timer Card (Moved) -->
+            <!-- Active Timer Card -->
             <div id="home-timer-card">
                 <div class="flex justify-between items-center">
                     <div class="flex-grow min-w-0 mr-2"> 
@@ -46,31 +45,12 @@
                 <div id="home-timer-time" class="font-mono text-3xl font-bold text-center mt-4">00:00:00</div>
             </div>
 
-            <!-- NEW: Home Agenda (Deadlines) -->
-            <div id="home-agenda-list-container">
-                <h3 class="text-xl font-semibold mb-3">Today's Agenda</h3>
-                <div id="home-agenda-list" class="space-y-3">
-                    <!-- Agenda items (deadlines) will be injected here -->
-                </div>
+            <!-- NEW: Simplified Today List -->
+            <div id="home-today-list" class="space-y-3">
+                <!-- Simplified list of today's items (goals, tasks, deadlines) will be injected here by JS -->
             </div>
 
-            <!-- NEW: Home Tasks -->
-            <div id="home-tasks-list-container">
-                <h3 class="text-xl font-semibold mb-3">Today's Tasks</h3>
-                <div id="home-tasks-list" class="space-y-3">
-                    <!-- Trackable tasks will be injected here -->
-                </div>
-            </div>
-            
-            <!-- NEW: Home Daily Goals -->
-            <div id="home-daily-goals-list-container">
-                <h3 class="text-xl font-semibold mb-3">Daily Goals</h3>
-                <div id="home-daily-goals-list" class="space-y-3">
-                    <!-- Recurring goals will be injected here -->
-                </div>
-            </div>
-
-            <!-- AI Summary (Unchanged) -->
+            <!-- AI Summary -->
             <div class="bg-white p-6 rounded-lg shadow-md">
                 <h3 class="text-xl font-semibold mb-2">AI Weekly Summary</h3>
                 <p class="text-sm mb-4" style="color: var(--text-secondary);">Get insights on your productivity from the last 7 days.</p>
@@ -82,137 +62,53 @@
         </div>
 
         <!-- ===================================================================== -->
-        <!-- PAGE 2: TRACK (Was Home Page)                                         -->
+        <!-- PAGE 2: TRACK (New "Command Center")                                  -->
         <!-- ===================================================================== -->
         <div id="track-page" class="page p-4">
-             <div class="flex justify-between items-center mb-6">
+             <div class="flex justify-between items-center mb-4">
                 <h1 class="text-3xl font-bold">Track</h1> 
             </div>
             
-            <!-- NEW: Datalist for categories -->
-            <datalist id="category-list-datalist"></datalist>
+            <!-- Search Box -->
+            <div class="relative mb-4">
+                <input type="text" id="search-box" placeholder="Search activities, categories, notes..." class="w-full p-3 pl-10 border rounded-lg shadow-sm" style="height: 3.5rem;">
+                <svg class="w-5 h-5 absolute top-1/2 left-3 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                <button id="view-toggle-btn" class="absolute top-1/2 right-3 -translate-y-1/2 p-2 rounded-full hover:bg-gray-200">
+                    <!-- List/Grid icon will be toggled by JS -->
+                    <svg id="view-toggle-icon-list" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+                    <svg id="view-toggle-icon-grid" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                </button>
+            </div>
 
-            <!-- Add Activity Form (Modified) -->
-            <form id="add-activity-form" class="space-y-3 mb-6">
-                <div class="flex gap-2">
-                    <button type="button" id="new-activity-emoji" class="p-3 emoji-input-btn" title="Select Emoji">😀</button>
-                    <input type="hidden" id="new-activity-emoji-value" value="😀">
-                    <input type="text" id="new-activity-name" placeholder="New activity name..." class="flex-grow p-3 focus:outline-none rounded-lg" style="height: 3.5rem;" maxlength="20">
-                    <input type="color" id="new-activity-color" value="#3b82f6" title="Select activity color">
+            <!-- Controls Row -->
+            <div class="flex items-center justify-between mb-4">
+                <button id="time-range-btn" class="text-lg font-semibold text-blue-600">Today</button>
+                <div class="flex items-center space-x-2">
+                    <button id="time-nav-prev" class="p-2 rounded-full hover:bg-gray-200 text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                    </button>
+                    <button id="time-nav-next" class="p-2 rounded-full hover:bg-gray-200 text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
                 </div>
-                <!-- Category & Add Button Row (Modified) -->
-                <div class="flex gap-2">
-                    <input type="text" id="new-activity-category" placeholder="Category (e.g., Work)" class="flex-grow p-3 focus:outline-none rounded-lg" style="height: 3.5rem;" maxlength="20" list="category-list-datalist">
-                    <button id="add-activity-btn" type="submit" class="bg-blue-600 text-white p-3 font-semibold transition rounded-lg" style="height: 3.5rem; min-width: 5rem;">Add</button>
-                </div>
-            </form>
-            
-            <div class="mb-6">
-                <button id="show-manual-entry-btn" class="w-full bg-gray-600 text-white p-3 rounded-lg font-semibold transition shadow-sm">Add Manual Entry</button>
+                <button id="filter-btn" class="p-2 rounded-full hover:bg-gray-200 text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM12 11a1 1 0 011-1h6a1 1 0 011 1v2a1 1 0 01-1 1h-6a1 1 0 01-1-1v-2zM6 11a1 1 0 011-1h.01a1 1 0 010 2H7a1 1 0 01-1-1zM18 18a1 1 0 011-1h.01a1 1 0 010 2H19a1 1 0 01-1-1zM6 18a1 1 0 011-1h6a1 1 0 011 1v2a1 1 0 01-1 1H7a1 1 0 01-1-1v-2z"></path></svg>
+                </button>
             </div>
 
-            <!-- Goal View Toggle (Modified) -->
-            <div id="goal-view-toggle" class="tab-container mb-4" style="grid-template-columns: repeat(4, 1fr);">
-                <button class="tab-btn" data-period="daily">Today</button> <!-- UPDATED TEXT -->
-                <button class="tab-btn active" data-period="weekly">Weekly</button>
-                <button class="tab-btn" data-period="monthly">Monthly</button>
-                <button class="tab-btn" data-period="yearly">Yearly</button>
-            </div>
-
-            <!-- NEW: Category Filter -->
-            <div class="mb-4">
-                <label for="category-filter" class="block text-sm font-medium mb-2">Filter by Category:</label>
-                <select id="category-filter" class="w-full p-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" style="height: 3.5rem;">
-                    <option value="all">All Categories</option>
-                    <!-- Categories will be injected here by JS -->
-                </select>
-            </div>
-
-            <h3 class="text-xl font-semibold mb-3">All Activities</h3>
-            <div id="activity-list" class="space-y-3">
-                <!-- Activity list will be injected here -->
+            <!-- Content Area: List or Grid -->
+            <div id="track-content-area" class="space-y-4">
+                <!-- This will be populated by JS with either the List View or Grid View -->
             </div>
         </div>
 
         <!-- ===================================================================== -->
-        <!-- PAGE 3: PLANNER (NEW)                                                 -->
+        <!-- PAGE 3: PLANNER (DELETED - Merged into Track)                         -->
         <!-- ===================================================================== -->
-        <div id="planner-page" class="page p-4">
-            <h1 class="text-3xl font-bold mb-6">Planner</h1>
 
-            <!-- Planner Tabs -->
-            <div id="planner-tab-container" class="tab-container mb-6" style="grid-template-columns: repeat(2, 1fr);">
-                <button class="tab-btn active" data-subpage="tasks">Tasks & Deadlines</button>
-                <button class="tab-btn" data-subpage="goals">Recurring Goals</button>
-            </div>
-
-            <!-- Sub-Page 1: Tasks & Deadlines -->
-            <div id="planner-subpage-tasks" class="sub-page active space-y-6">
-                <!-- Add Planner Item Form -->
-                <form id="add-planner-item-form" class="bg-white p-4 rounded-lg shadow-md space-y-4">
-                    <h3 class="text-xl font-semibold">Add New Item</h3>
-                    
-                    <div>
-                        <label for="planner-item-type" class="block text-sm font-medium mb-2">Item Type</label>
-                        <select id="planner-item-type" class="w-full p-3 border rounded-lg shadow-sm">
-                            <option value="task">One-off Task (Trackable)</option>
-                            <option value="deadline">Deadline (Not Trackable)</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label for="planner-item-name" class="block text-sm font-medium mb-2">Name</label>
-                        <input type="text" id="planner-item-name" placeholder="E.g., Finish report" class="w-full" maxlength="40">
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label for="planner-item-due-date" class="block text-sm font-medium mb-2">Due Date</label>
-                            <input type="date" id="planner-item-due-date" class="w-full">
-                        </div>
-                        <div id="planner-target-hours-group">
-                            <label for="planner-item-target-hours" class="block text-sm font-medium mb-2">Target (Hours)</label>
-                            <input type="number" id="planner-item-target-hours" min="0" step="0.5" placeholder="E.g., 4" class="w-full">
-                        </div>
-                    </div>
-                    
-                    <button id="add-planner-item-btn" type="submit" class="w-full bg-blue-600 text-white p-3 font-semibold transition rounded-lg">Add to Planner</button>
-                </form>
-
-                <!-- Planner Item List -->
-                <div id="planner-item-list-container">
-                    <!-- Items will be sorted and injected here by JS -->
-                    <h2 class="category-header">Overdue</h2>
-                    <div id="planner-list-overdue" class="space-y-3 mb-4"></div>
-                    
-                    <h2 class="category-header">Today</h2>
-                    <div id="planner-list-today" class="space-y-3 mb-4"></div>
-                    
-                    <h2 class="category-header">Upcoming</h2>
-                    <div id="planner-list-upcoming" class="space-y-3 mb-4"></div>
-
-                    <h2 class="category-header">Completed</h2>
-                    <div id="planner-list-completed" class="space-y-3"></div>
-                </div>
-            </div>
-
-            <!-- Sub-Page 2: Recurring Goals -->
-            <div id="planner-subpage-goals" class="sub-page space-y-6">
-                <div class="bg-white p-4 rounded-lg shadow-md">
-                    <p class="text-sm" style="color: var(--text-secondary);">
-                        Recurring goals are set on your main activities. Go to the 
-                        <button class="text-blue-600 font-medium" onclick="showPage('track')">Track</button> 
-                        page and edit an activity to set a daily, weekly, or monthly goal.
-                    </p>
-                </div>
-                <div id="planner-recurring-goals-list" class="space-y-3">
-                    <!-- Recurring goals list will be injected here -->
-                </div>
-            </div>
-        </div>
 
         <!-- ===================================================================== -->
-        <!-- PAGE 4: ANALYSIS                                                        -->
+        <!-- PAGE 3: ANALYSIS (Was Page 4)                                         -->
         <!-- ===================================================================== -->
         <div id="analysis-page" class="page p-4 view-daily">
             <h1 class="text-3xl font-bold mb-6">Analysis</h1>
@@ -270,7 +166,7 @@
         </div>
 
         <!-- ===================================================================== -->
-        <!-- PAGE 5: SETTINGS (Was Page 4)                                         -->
+        <!-- PAGE 4: SETTINGS (Was Page 5)                                         -->
         <!-- ===================================================================== -->
         <div id="settings-page" class="page p-4">
             <h1 class="text-3xl font-bold mb-6">Settings</h1>
@@ -314,10 +210,12 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Global Settings Card (DELETED) -->
-
         </div>
+        
+        <!-- NEW: Universal Add Button -->
+        <button id="universal-add-btn" class="fixed bottom-20 right-5 bg-blue-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center z-40">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+        </button>
     </div>
 
     <!-- Flip Clock Page (No changes) -->
@@ -362,7 +260,7 @@
     </div>
 
     <!-- ===================================================================== -->
-    <!-- MODALS                                                                  -->
+    <!-- MODALS (Existing)                                                       -->
     <!-- ===================================================================== -->
     
     <!-- Stop Note Modal (No changes) -->
@@ -391,16 +289,13 @@
     <!-- Edit Log Modal (No changes) -->
     <div id="edit-log-modal" class="modal fixed inset-0 z-50 items-center justify-center p-4 overflow-y-auto"><div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mt-20"><h3 class="text-xl font-bold mb-6">Edit Time Log</h3><form id="edit-log-form" class="space-y-4"><input type="hidden" id="edit-log-id"><div><label for="edit-activity-name" class="block text-sm font-medium">Activity</label><input type="text" id="edit-activity-name" class="mt-1 block w-full p-3 border rounded-lg bg-gray-100 dark:bg-gray-700" readonly></div><div><label for="edit-date" class="block text-sm font-medium">Date</label><input type="date" id="edit-date" class="mt-1 block w-full p-3 border rounded-lg shadow-sm"></div><div class="grid grid-cols-2 gap-4"><div><label for="edit-start-time" class="block text-sm font-medium">Start Time</label><input type="time" id="edit-start-time" class="mt-1 block w-full p-3 border rounded-lg shadow-sm"></div><div><label for="edit-end-time" class="block text-sm font-medium">End Time</label><input type="time" id="edit-end-time" class="mt-1 block w-full p-3 border rounded-lg shadow-sm"></div></div><div><label for="edit-notes" class="block text-sm font-medium">Notes (Optional)</label><textarea id="edit-notes" rows="3" class="mt-1 block w-full p-3 border rounded-lg shadow-sm"></textarea></div><div class="flex justify-end space-x-3 pt-4"><button type="button" id="cancel-edit-log-btn" class="bg-gray-300 px-4 py-2 rounded-lg font-semibold transition">Cancel</button><button type="submit" id="save-edit-log-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold transition">Save Changes</button></div></form></div></div>
     
-    <!-- ======================================================== -->
-    <!-- Edit Activity Modal (HEAVILY UPDATED)                    -->
-    <!-- ======================================================== -->
+    <!-- Edit Activity Modal (Modified) -->
     <div id="edit-activity-modal" class="modal fixed inset-0 z-50 items-center justify-center p-4">
         <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
             <h3 class="text-xl font-bold mb-6">Edit Activity</h3>
             <form id="edit-activity-form" class="space-y-4">
                 <input type="hidden" id="edit-activity-id">
                 
-                <!-- Symmetrical layout -->
                 <div>
                     <label class="block text-sm font-medium mb-2">Activity</label>
                     <div class="flex gap-2">
@@ -411,13 +306,11 @@
                     </div>
                 </div>
 
-                <!-- Category -->
                 <div>
                     <label for="edit-activity-category" class="block text-sm font-medium">Category</label>
                     <input type="text" id="edit-activity-category" placeholder="E.g., Work, Uni, Personal" class="mt-1 block w-full p-3 border rounded-lg shadow-sm" maxlength="20" list="category-list-datalist">
                 </div>
                 
-                <!-- Expanded Goals -->
                 <div>
                     <label class="block text-sm font-medium">Goal</label>
                     <div class="flex gap-2 mt-1">
@@ -432,16 +325,14 @@
                     </div>
                 </div>
 
-                <!-- Pin Toggle (Unchanged) -->
                 <div class="flex justify-between items-center pt-2">
-                    <label for="edit-activity-pin" class="block text-sm font-medium">Pin to Quick Start</label>
+                    <label for="edit-activity-pin" class="block text-sm font-medium">Pin to Home (Deprecated)</label>
                     <label class="toggle-switch">
                         <input type="checkbox" id="edit-activity-pin">
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
 
-                <!-- Button layout -->
                 <div class="flex justify-between items-center pt-4 mt-4 border-t" style="border-color: var(--border-color);">
                     <button type="button" id="delete-activity-from-modal-btn" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold transition">Delete</button>
                     
@@ -482,35 +373,113 @@
     </div>
 
     <!-- ===================================================================== -->
-    <!-- NAVIGATION (UPDATED with 5 tabs)                                        -->
+    <!-- MODALS (New)                                                            -->
+    <!-- ===================================================================== -->
+
+    <!-- NEW: Universal Add Item Modal (Bottom Sheet) -->
+    <div id="add-item-modal" class="modal fixed inset-0 z-50 items-end justify-center p-4">
+        <div class="bg-white p-6 rounded-t-lg shadow-xl w-full max-w-lg">
+            <h3 class="text-xl font-bold mb-6">Add New Item</h3>
+            <form id="add-item-form" class="space-y-4">
+                <!-- Form content will be similar to old planner form -->
+                <div>
+                    <label for="add-item-type" class="block text-sm font-medium mb-2">Item Type</label>
+                    <select id="add-item-type" class="w-full">
+                        <option value="activity">Activity (Recurring Goal)</option>
+                        <option value="task">Task (Trackable, One-off)</option>
+                        <option value="deadline">Deadline (Not Trackable)</option>
+                    </select>
+                </div>
+                <!-- ... other form fields for name, category, dates, goals etc ... -->
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" id="cancel-add-item-btn" class="bg-gray-300 px-4 py-2">Cancel</button>
+                    <button type="submit" id="save-add-item-btn" class="bg-blue-600 text-white px-4 py-2">Add Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- NEW: Time Range Modal (Bottom Sheet) -->
+    <div id="time-range-modal" class="modal fixed inset-0 z-50 items-end justify-center p-4">
+        <div class="bg-white p-6 rounded-t-lg shadow-xl w-full max-w-lg">
+            <h3 class="text-xl font-bold mb-4">Select Time Range</h3>
+            <div class="space-y-2">
+                <button class="w-full p-3 text-left rounded-lg hover:bg-gray-200" data-range="today">Today</button>
+                <button class="w-full p-3 text-left rounded-lg hover:bg-gray-200" data-range="week">This Week</button>
+                <button class="w-full p-3 text-left rounded-lg hover:bg-gray-200" data-range="month">This Month</button>
+                <button class="w-full p-3 text-left rounded-lg hover:bg-gray-200" data-range="year">This Year</button>
+                <button class="w-full p-3 text-left rounded-lg hover:bg-gray-200" data-range="all">All Time</button>
+                <button class="w-full p-3 text-left rounded-lg hover:bg-gray-200" data-range="custom">Custom Range...</button>
+            </div>
+            <button type="button" id="cancel-time-range-btn" class="w-full bg-gray-300 px-4 py-2 mt-6">Cancel</button>
+        </div>
+    </div>
+
+    <!-- NEW: Filter Modal (Full Screen) -->
+    <div id="filter-modal" class="modal fixed inset-0 z-50 items-start justify-center p-0">
+        <div class="bg-white w-full h-full max-w-lg overflow-y-auto">
+            <!-- Header -->
+            <div class="flex items-center p-4 border-b">
+                <button id="close-filter-modal-btn" class="p-2 rounded-full hover:bg-gray-200">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                <h2 class="text-2xl font-bold ml-4">Filters</h2>
+            </div>
+            
+            <div class="p-4 space-y-6">
+                <!-- Filter by Type -->
+                <div>
+                    <h3 class="text-lg font-semibold mb-3">Item Type</h3>
+                    <div id="filter-type-container" class="flex space-x-2">
+                        <button class="filter-toggle-btn flex-1 p-3" data-type="goal">Goal</button>
+                        <button class="filter-toggle-btn flex-1 p-3" data-type="task">Task</button>
+                        <button class="filter-toggle-btn flex-1 p-3" data-type="deadline">Deadline</button>
+                    </div>
+                </div>
+
+                <!-- Filter by Activity/Category -->
+                <div>
+                    <!-- Tabs -->
+                    <div class="flex border-b">
+                        <button id="filter-tab-activities" class="flex-1 p-3 font-semibold border-b-2 border-blue-600">Activities</button>
+                        <button id="filter-tab-categories" class="flex-1 p-3 font-semibold text-gray-500">Categories</button>
+                    </div>
+                    <!-- Lists -->
+                    <div id="filter-list-activities" class="mt-4 max-h-60 overflow-y-auto space-y-2">
+                        <!-- Activity filter items will be injected here -->
+                    </div>
+                    <div id="filter-list-categories" class="mt-4 max-h-60 overflow-y-auto space-y-2" style="display: none;">
+                        <!-- Category filter items will be injected here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- NAVIGATION (UPDATED with 4 tabs)                                        -->
     <!-- ===================================================================== -->
     <nav class="fixed bottom-0 left-0 right-0 border-t shadow-lg">
         <div class="container mx-auto max-w-lg flex justify-around">
-            <!-- Tab 1: Home (NEW) -->
+            <!-- Tab 1: Home -->
             <button class="nav-btn active-nav flex-1 flex flex-col items-center p-3" data-page="home">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10 0h3a1 1 0 001-1V10M5 10l7-7 7 7"></path></svg>
                 <span class="text-xs">Home</span>
             </button>
             
-            <!-- Tab 2: Track -->
+            <!-- Tab 2: Track (Was Planner) -->
             <button class="nav-btn flex-1 flex flex-col items-center p-3" data-page="track">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
                 <span class="text-xs">Track</span>
             </button>
 
-            <!-- Tab 3: Planner (NEW) -->
-            <button class="nav-btn flex-1 flex flex-col items-center p-3" data-page="planner">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
-                <span class="text-xs">Planner</span>
-            </button>
-
-            <!-- Tab 4: Analysis -->
+            <!-- Tab 3: Analysis -->
             <button class="nav-btn flex-1 flex flex-col items-center p-3" data-page="analysis">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                 <span class="text-xs">Analysis</span>
             </button>
 
-            <!-- Tab 5: Settings -->
+            <!-- Tab 4: Settings -->
             <button class="nav-btn flex-1 flex flex-col items-center p-3" data-page="settings">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826 3.31 2.37-2.37a1.724 1.724 0 002.573-1.066zM15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 <span class="text-xs">Settings</span>
@@ -522,3 +491,4 @@
 
 </body>
 </html>
+
