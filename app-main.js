@@ -1,12 +1,13 @@
 // --- NEW Home Page Rendering ---
 function renderHomePage() {
     if (!userId) {
-        homeTodayList.innerHTML = `<p class="text-center text-muted text-sm w-full">Please sign in.</p>`;
+        homeCardsContainer.innerHTML = `<p class="text-center text-muted text-sm w-full">Please sign in.</p>`;
         homeTimerCard.classList.remove('active');
         aiSummaryContent.style.display = 'none';
         return;
     }
 
+    const today = getStartOfDate(new Date());
     const todayString = getTodayString();
     
     // 1. Render Active Timer Card
@@ -19,45 +20,87 @@ function renderHomePage() {
     } else {
         homeTimerCard.classList.remove('active');
     }
-
-    // 2. Render Today List (Goals, Tasks, Deadlines)
-    homeTodayList.innerHTML = '';
     
-    // Get Today's Planner Items
+    // --- 2. Render Today's Items Card ---
+    homeTodayList.innerHTML = '';
     const todayPlannerItems = Array.from(plannerItems.values())
         .filter(item => item.dueDate === todayString && !item.isCompleted)
         .sort((a, b) => a.name.localeCompare(b.name));
+    
+    if (todayPlannerItems.length > 0) {
+        homeTodayCard.style.display = 'block';
+        todayPlannerItems.forEach(item => {
+            homeTodayList.insertAdjacentHTML('beforeend', renderHomeItem(item, item.type));
+        });
+    } else {
+        homeTodayCard.style.display = 'none';
+    }
 
-    // Get Daily Goals from Activities
+    // --- 3. Render Daily Goals Card ---
+    homeGoalsList.innerHTML = '';
     const dailyGoals = Array.from(activities.values())
         .filter(act => act.goal && act.goal.period === 'daily' && act.goal.value > 0)
         .sort((a, b) => a.name.localeCompare(b.name));
-
-    let itemsFound = false;
-
-    // Render Daily Goals
+        
     if (dailyGoals.length > 0) {
-        itemsFound = true;
+        homeGoalsCard.style.display = 'block';
         dailyGoals.forEach(activity => {
             const totalTodayMs = allTimeLogs
                 .filter(log => log.activityId === activity.id && log.timerType === 'activity' && new Date(log.startTime) >= getStartOfDate(new Date()))
                 .reduce((acc, log) => acc + log.durationMs, 0);
             
-            homeTodayList.insertAdjacentHTML('beforeend', renderHomeItem(activity, 'goal', totalTodayMs));
+            homeGoalsList.insertAdjacentHTML('beforeend', renderHomeItem(activity, 'goal', totalTodayMs));
         });
+    } else {
+        homeGoalsCard.style.display = 'none';
+    }
+    
+    // --- 4. Render Upcoming Card ---
+    homeUpcomingList.innerHTML = '';
+    const nextSevenDays = new Date(today);
+    nextSevenDays.setDate(today.getDate() + 7);
+    
+    const upcomingItems = Array.from(plannerItems.values())
+        .filter(item => {
+            const dueDate = new Date(item.dueDate + 'T00:00:00');
+            return dueDate > today && dueDate <= nextSevenDays && !item.isCompleted;
+        })
+        .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+        
+    if (upcomingItems.length > 0) {
+        homeUpcomingCard.style.display = 'block';
+        upcomingItems.forEach(item => {
+            homeUpcomingList.insertAdjacentHTML('beforeend', renderHomeItem(item, item.type));
+        });
+    } else {
+        homeUpcomingCard.style.display = 'none';
     }
 
-    // Render Today's Planner Items
-    if (todayPlannerItems.length > 0) {
-        itemsFound = true;
-        todayPlannerItems.forEach(item => {
-            homeTodayList.insertAdjacentHTML('beforeend', renderHomeItem(item, item.type));
+    // --- 5. Render Notifications Card ---
+    homeNotificationsList.innerHTML = '';
+    const notificationItems = Array.from(plannerItems.values())
+        .filter(item => {
+            if (item.isCompleted || !item.notifyDays || item.notifyDays === 'none') {
+                return false;
+            }
+            const notifyDays = parseInt(item.notifyDays);
+            const notifyDate = new Date(item.dueDate + 'T00:00:00');
+            notifyDate.setDate(notifyDate.getDate() - notifyDays);
+            
+            return today >= notifyDate && today <= new Date(item.dueDate + 'T00:00:00');
+        })
+        .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+
+    if (notificationItems.length > 0) {
+        homeNotificationsCard.style.display = 'block';
+        notificationItems.forEach(item => {
+            homeNotificationsList.insertAdjacentHTML('beforeend', renderHomeItem(item, item.type));
         });
+    } else {
+        homeNotificationsCard.style.display = 'none';
     }
 
-    if (!itemsFound) {
-        homeTodayList.innerHTML = `<p class="text-sm" style="color: var(--text-muted);">Nothing scheduled for today. Tap the '+' button to add an item.</p>`;
-    }
+    // --- 6. AI Summary Card (already exists) ---
 }
 
 // NEW: Renderer for a single item on the Home page
@@ -66,10 +109,22 @@ function renderHomeItem(item, type, totalTodayMs = 0) {
                       ((type === 'task' && currentTimer.timerType === 'task') || (type === 'goal' && currentTimer.timerType === 'activity'));
     const timerActive = currentTimer !== null;
 
-    let emoji, name, detailsHtml, actionHtml;
+    let iconHtml, name, detailsHtml, actionHtml;
+    const today = getStartOfDate(new Date());
 
     if (type === 'goal') {
-        emoji = item.emoji || '🎯';
+        const category = categories.get(item.categoryId) || {};
+        iconHtml = `
+            <div class="icon-badge-container">
+                <div class="icon-badge-main" style="background-color: ${item.color || '#808080'}; color: white;">
+                    <i class="bi ${item.iconName || 'bi-bullseye'}"></i>
+                </div>
+                ${category.iconName ? `
+                <div class="icon-badge-secondary" style="background-color: ${category.color || '#808080'};">
+                    <i class="bi ${category.iconName}"></i>
+                </div>` : ''}
+            </div>
+        `;
         name = item.name;
         
         let goalMs = (item.goal.value || 0) * 3600000;
@@ -90,7 +145,7 @@ function renderHomeItem(item, type, totalTodayMs = 0) {
             </button>
         `;
     } else if (type === 'task') {
-        emoji = '📌'; // Task emoji
+        iconHtml = `<div class="icon-badge-main"><i class="bi bi-check2-circle"></i></div>`;
         name = item.name;
         const tracked = item.trackedDurationMs || 0;
         let subtext = `${formatShortDuration(tracked)} tracked`;
@@ -109,9 +164,12 @@ function renderHomeItem(item, type, totalTodayMs = 0) {
             </button>
         `;
     } else { // 'deadline'
-        emoji = '📅'; // Deadline emoji
+        iconHtml = `<div class="icon-badge-main"><i class="bi bi-calendar-event"></i></div>`;
         name = item.name;
-        detailsHtml = `<p>Deadline</p>`;
+        const dueDate = new Date(item.dueDate + 'T00:00:00');
+        let subtext = dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        if (dueDate < today) subtext = `Overdue: ${subtext}`;
+        detailsHtml = `<p>${subtext}</p>`;
         actionHtml = `
             <input type="checkbox" class="home-item-checkbox" data-id="${item.id}" ${item.isCompleted ? 'checked' : ''}>
         `;
@@ -119,7 +177,7 @@ function renderHomeItem(item, type, totalTodayMs = 0) {
 
     return `
     <div class="home-item" data-id="${item.id}" data-type="${type}">
-        <span class="home-item-emoji">${emoji}</span>
+        ${iconHtml}
         <div class="home-item-details">
             <h4>${name}</h4>
             ${detailsHtml}
@@ -134,6 +192,7 @@ function handleHomeItemClick(e) {
     const startTaskBtn = e.target.closest('.btn-start-task');
     const startActivityBtn = e.target.closest('.btn-start-activity');
     const checkbox = e.target.closest('.home-item-checkbox');
+    const mainItem = e.target.closest('.home-item');
 
     if (startTaskBtn && !startTaskBtn.disabled) {
         const id = startTaskBtn.dataset.id;
@@ -150,6 +209,10 @@ function handleHomeItemClick(e) {
     } else if (checkbox) {
         const id = checkbox.dataset.id;
         handlePlannerItemCheck(id, checkbox.checked);
+    } else if (mainItem) {
+        // Open edit modal when clicking the item
+        const id = mainItem.dataset.id;
+        showAddItemModal(id);
     }
 }
 
@@ -252,17 +315,6 @@ async function fetchWithBackoff(url, options, retries = 3, delay = 1000) {
 }
 
 // --- Track Page (NEW) ---
-
-// renderQuickStart() and handleQuickStartClick() are DELETED
-// loadTodaysTimeLogs() is DELETED
-// handleGoalViewToggle() is DELETED
-// getGoalDateRange() is DELETED
-// updateLogCache() is DELETED
-// renderGoalItem() is DELETED (logic moved to renderHomeItem/renderTrackItem)
-// renderActivityList() is DELETED (replaced by renderTrackPage)
-
-// --- NEW Track Page Main Functions ---
-
 function handleViewToggle() {
     if (currentTrackView === 'list') {
         currentTrackView = 'grid';
@@ -299,18 +351,14 @@ async function renderTrackList() {
     // 1. Get all items (Goals from Activities, Tasks/Deadlines from Planner)
     let allItems = [];
     
-    // Get Goals from activities
     activities.forEach(activity => {
-        if (activity.goal && activity.goal.value > 0) {
-            allItems.push({
-                ...activity,
-                type: 'goal',
-                date: null // Recurring goals don't have a single due date
-            });
-        }
+        allItems.push({
+            ...activity,
+            type: 'goal', // All activities are treated as "Goals"
+            date: null 
+        });
     });
 
-    // Get Tasks and Deadlines from planner
     plannerItems.forEach(item => {
         allItems.push({
             ...item,
@@ -327,32 +375,18 @@ async function renderTrackList() {
         // Filter by Search Query
         if (searchQuery) {
             const name = item.name?.toLowerCase() || '';
-            const category = item.category?.toLowerCase() || '';
-            const notes = item.notes?.toLowerCase() || ''; // For deadlines
+            const notes = item.notes?.toLowerCase() || '';
+            const category = categories.get(item.categoryId)?.name?.toLowerCase() || '';
             if (!name.includes(searchQuery) && !category.includes(searchQuery) && !notes.includes(searchQuery)) {
                 return false;
             }
         }
         
-        // Filter by Type
-        if (currentTrackFilters.types.length > 0 && !currentTrackFilters.types.includes(item.type)) {
-            return false;
-        }
+        // Filter by Type (TODO: Re-implement filter modal)
         
-        // Filter by Activity (only applies to goals)
-        if (item.type === 'goal' && currentTrackFilters.activities.length > 0 && !currentTrackFilters.activities.includes(item.id)) {
-            return false;
-        }
-
-        // Filter by Category
-        if (currentTrackFilters.categories.length > 0 && !currentTrackFilters.categories.includes(item.category)) {
-            return false;
-        }
-
-        // Filter by Time Range (only for tasks and deadlines)
+        // Filter by Time Range
         if (item.type === 'task' || item.type === 'deadline') {
             if (item.date < currentTrackTimeRange.start || item.date > currentTrackTimeRange.end) {
-                // Check for overdue items if range includes today
                 const isOverdue = item.date < today && !item.isCompleted;
                 const rangeIncludesToday = currentTrackTimeRange.start <= today && currentTrackTimeRange.end >= today;
                 
@@ -362,32 +396,18 @@ async function renderTrackList() {
                     return false;
                 }
             }
+        } else if (item.type === 'goal') {
+            // Goals are always shown unless filtered by category/name
         }
         
         return true;
     });
     
-    // 3. Group filtered items by day
+    // 3. Group filtered items
     const groups = new Map();
     const todayString = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     
-    // Add recurring goals to a special 'Recurring' group if they fit the period
-    filteredItems.filter(item => item.type === 'goal').forEach(goal => {
-        const period = goal.goal.period;
-        let groupName = 'Recurring Goals';
-        
-        if (period === 'daily' && currentTrackTimeRange.type !== 'today') groupName = null;
-        if (period === 'weekly' && currentTrackTimeRange.type !== 'week') groupName = null;
-        if (period === 'monthly' && currentTrackTimeRange.type !== 'month') groupName = null;
-        if (period === 'yearly' && currentTrackTimeRange.type !== 'year') groupName = null;
-        
-        if (groupName) {
-            if (!groups.has(groupName)) groups.set(groupName, []);
-            groups.get(groupName).push(goal);
-        }
-    });
-
-    // Add tasks and deadlines
+    // Group Overdue, Today, and Upcoming Tasks/Deadlines
     filteredItems.filter(item => item.type === 'task' || item.type === 'deadline').forEach(item => {
         let groupName;
         if (item.date < today && !item.isCompleted) {
@@ -400,6 +420,14 @@ async function renderTrackList() {
         if (!groups.has(groupName)) groups.set(groupName, []);
         groups.get(groupName).push(item);
     });
+    
+    // Group Activities by Category
+    filteredItems.filter(item => item.type === 'goal').forEach(activity => {
+        const category = categories.get(activity.categoryId) || { name: 'Uncategorized' };
+        const groupName = `Category: ${category.name}`;
+        if (!groups.has(groupName)) groups.set(groupName, []);
+        groups.get(groupName).push(activity);
+    });
 
     // 4. Render groups
     trackContentArea.innerHTML = '';
@@ -409,21 +437,20 @@ async function renderTrackList() {
         return;
     }
 
-    // Sort groups (Overdue, Today, Recurring Goals, then by date)
+    // Sort groups
     const sortedGroupNames = Array.from(groups.keys()).sort((a, b) => {
         if (a === 'Overdue') return -1;
         if (b === 'Overdue') return 1;
         if (a === 'Today') return -1;
         if (b === 'Today') return 1;
-        if (a === 'Recurring Goals') return -1;
-        if (b === 'Recurring Goals') return 1;
+        if (a.startsWith('Category:')) return 1; // Put categories at the bottom
+        if (b.startsWith('Category:')) return -1;
         return new Date(a) - new Date(b); // Sort by date
     });
 
     sortedGroupNames.forEach(groupName => {
         const items = groups.get(groupName).sort((a, b) => a.name.localeCompare(b.name));
         
-        // Calculate group totals
         let totalGoalMs = 0;
         let totalTrackedMs = 0;
         
@@ -433,8 +460,7 @@ async function renderTrackList() {
                 
                 if (item.type === 'task') {
                     totalTrackedMs += item.trackedDurationMs || 0;
-                } else { // 'goal'
-                    // Find logs for this goal within the current time range
+                } else { 
                     totalTrackedMs += allTimeLogs
                         .filter(log => log.activityId === item.id && 
                                        log.timerType === 'activity' && 
@@ -447,7 +473,7 @@ async function renderTrackList() {
 
         const headerHtml = `
             <div class="track-list-header">
-                <h2>${groupName}</h2>
+                <h2>${groupName.replace('Category: ', '')}</h2>
                 <p>
                     ${totalTrackedMs > 0 ? `${formatShortDuration(totalTrackedMs)}` : ''}
                     ${totalGoalMs > 0 ? `<span> / ${formatShortDuration(totalGoalMs)}</span>` : ''}
@@ -469,19 +495,47 @@ function renderTrackItem(item) {
     const timerActive = currentTimer !== null;
     const isOverdue = (item.type === 'task' || item.type === 'deadline') && new Date(item.dueDate + 'T00:00:00') < getStartOfDate(new Date()) && !item.isCompleted;
 
-    let emoji, name, subtext, progressBar, actionHtml;
+    let iconHtml, name, subtext, progressBar, actionHtml;
 
     if (item.type === 'goal' || item.type === 'task') {
-        emoji = item.emoji || (item.type === 'goal' ? '🎯' : '📌');
-        name = item.name;
-        subtext = item.category || (item.type === 'goal' ? `${item.goal.period} goal` : 'Task');
+        let itemIcon = 'bi-bullseye'; // Default for goal
+        let itemColor = '#808080';
+        let categoryIcon = '';
+        let categoryColor = '#808080';
         
+        if (item.type === 'goal') {
+            const category = categories.get(item.categoryId);
+            itemIcon = item.iconName || 'bi-bullseye';
+            itemColor = item.color || '#808080';
+            if (category) {
+                categoryIcon = category.iconName;
+                categoryColor = category.color;
+            }
+            name = item.name;
+            subtext = category?.name || 'Uncategorized';
+        } else { // 'task'
+            itemIcon = 'bi-check2-circle';
+            name = item.name;
+            subtext = 'Task';
+        }
+        
+        iconHtml = `
+            <div class="icon-badge-container">
+                <div class="icon-badge-main" style="background-color: ${itemColor}; color: white;">
+                    <i class="bi ${itemIcon}"></i>
+                </div>
+                ${categoryIcon ? `
+                <div class="icon-badge-secondary" style="background-color: ${categoryColor};">
+                    <i class="bi ${categoryIcon}"></i>
+                </div>` : ''}
+            </div>
+        `;
+
         let trackedMs = 0;
         let targetMs = 0;
 
         if (item.type === 'goal') {
-            targetMs = (item.goal.value || 0) * 3600000;
-            // Get tracked time within the current range
+            targetMs = (item.goal?.value || 0) * 3600000;
             trackedMs = allTimeLogs
                 .filter(log => log.activityId === item.id && 
                                log.timerType === 'activity' &&
@@ -497,9 +551,9 @@ function renderTrackItem(item) {
         
         progressBar = `
             <div class="track-item-progress-bar">
-                <div class="track-item-progress-fill" style="width: ${percentage}%; background-color: ${item.color || '#808080'}"></div>
+                <div class="track-item-progress-fill" style="width: ${percentage}%; background-color: ${itemColor}"></div>
             </div>
-            <p>${formatShortDuration(trackedMs)} / ${formatShortDuration(targetMs)} (${percentage.toFixed(0)}%)</p>
+            <p>${formatShortDuration(trackedMs)} ${targetMs > 0 ? `/ ${formatShortDuration(targetMs)} (${percentage.toFixed(0)}%)` : ''}</p>
         `;
         
         actionHtml = `
@@ -513,7 +567,7 @@ function renderTrackItem(item) {
         `;
 
     } else { // 'deadline'
-        emoji = '📅';
+        iconHtml = `<div class="icon-badge-main"><i class="bi bi-calendar-event"></i></div>`;
         name = item.name;
         subtext = item.notes || 'Deadline';
         progressBar = '';
@@ -525,7 +579,7 @@ function renderTrackItem(item) {
     return `
     <div class="track-item ${isOverdue ? 'overdue' : ''}" data-id="${item.id}" data-type="${item.type}">
         <div class="track-item-main" data-id="${item.id}" data-type="${item.type}">
-            <div class="track-item-emoji">${emoji}</div>
+            ${iconHtml}
             <div class="track-item-details">
                 <h4>${name}</h4>
                 <p>${subtext}</p>
@@ -545,12 +599,10 @@ function renderTrackGrid() {
     
     const { start, end } = currentTrackTimeRange;
     
-    // Get all logs within the range
     const logsInRange = allTimeLogs.filter(log => {
         return log.startTime >= start.getTime() && log.startTime <= end.getTime();
     });
 
-    // Group logs by day
     const hoursByDay = new Map(); // Key: 'YYYY-MM-DD'
     logsInRange.forEach(log => {
         const dayStr = new Date(log.startTime).toLocaleDateString('en-CA');
@@ -558,19 +610,16 @@ function renderTrackGrid() {
         hoursByDay.set(dayStr, (hoursByDay.get(dayStr) || 0) + hours);
     });
     
-    // Find max hours for heatmap levels
     const maxHours = Math.max(0, ...hoursByDay.values());
     
     let loopDate = new Date(start);
     
-    // Add padding for the first day
     let firstDayIndex = loopDate.getDay();
     firstDayIndex = (firstDayIndex === 0) ? 6 : (firstDayIndex - 1); // Mon=0, Sun=6
     for (let i = 0; i < firstDayIndex; i++) {
         gridHtml += '<div class="heatmap-day-padding"></div>';
     }
     
-    // Generate day cells
     while (loopDate <= end) {
         const dayStr = loopDate.toLocaleDateString('en-CA');
         const hours = hoursByDay.get(dayStr) || 0;
@@ -586,7 +635,7 @@ function renderTrackGrid() {
     trackContentArea.innerHTML = gridHtml;
 }
 
-// NEW: Heatmap level calculator (different from analysis one)
+// Heatmap level calculator
 function getHeatmapLevel(hours, maxHours) {
     if (hours <= 0) return 0;
     if (maxHours <= 0) return 1; // Avoid division by zero
@@ -626,15 +675,8 @@ function handleTrackListClick(e) {
         handlePlannerItemCheck(checkbox.dataset.id, checkbox.checked);
     } else if (mainItem) {
         const id = mainItem.dataset.id;
-        const type = mainItem.dataset.type;
-        
-        if (type === 'goal') {
-            activityToEditId = id;
-            showEditActivityModal();
-        } else { // 'task' or 'deadline'
-            // Show new edit planner item modal (or reuse add modal)
-            showAddItemModal(id); // Pass ID to edit
-        }
+        // NEW: Open the add/edit modal for ANY item type
+        showAddItemModal(id);
     }
 }
 
@@ -712,13 +754,24 @@ function updateTimeRange(rangeType, customStart = null, customEnd = null) {
     currentTrackTimeRange.end = end;
     
     // Update button text
-    const options = { month: 'short', day: 'numeric' };
-    if (rangeType === 'today') trackTimeRangeBtn.textContent = 'Today';
-    else if (rangeType === 'week') trackTimeRangeBtn.textContent = `Week: ${start.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}`;
-    else if (rangeType === 'month') trackTimeRangeBtn.textContent = start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    else if (rangeType === 'year') trackTimeRangeBtn.textContent = start.getFullYear().toString();
-    else if (rangeType === 'all') trackTimeRangeBtn.textContent = 'All Time';
-    else if (rangeType === 'custom') trackTimeRangeBtn.textContent = `${start.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}`;
+    const options = { day: '2-digit', month: '2-digit', year: 'numeric' };
+    if (rangeType === 'today') {
+        trackTimeRangeBtn.textContent = start.toLocaleDateString('en-GB', options);
+    } else if (rangeType === 'week') {
+        trackTimeRangeBtn.textContent = `${start.toLocaleDateString('en-GB', options)} - ${end.toLocaleDateString('en-GB', options)}`;
+    } else if (rangeType === 'month') {
+        trackTimeRangeBtn.textContent = start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    } else if (rangeType === 'year') {
+        trackTimeRangeBtn.textContent = start.getFullYear().toString();
+    } else if (rangeType === 'all') {
+        trackTimeRangeBtn.textContent = 'All Time';
+    } else if (rangeType === 'custom') {
+        if (start.getTime() === end.getTime()) {
+            trackTimeRangeBtn.textContent = start.toLocaleDateString('en-GB', options);
+        } else {
+            trackTimeRangeBtn.textContent = `${start.toLocaleDateString('en-GB', options)} - ${end.toLocaleDateString('en-GB', options)}`;
+        }
+    }
 }
 
 // NEW: Map Time Range (Prev/Next)
@@ -731,9 +784,9 @@ function mapTimeRange(direction) {
         updateTimeRange('custom', newStart, newStart);
     } else if (type === 'week') {
         newStart.setDate(newStart.getDate() + (7 * direction));
-        updateTimeRange('week', newStart); // updateTimeRange recalculates start/end for 'week'
+        updateTimeRange('week', newStart);
     } else if (type === 'month') {
-        newStart.setDate(1); // Go to start of month to avoid date overflow
+        newStart.setDate(1); 
         newStart.setMonth(newStart.getMonth() + direction);
         updateTimeRange('month', newStart);
     } else if (type === 'year') {
@@ -768,7 +821,6 @@ function startTimer(activityId, activityName, activityColor, timerType = 'activi
      bannerActivityName.textContent = activityName;
      updateTimerUI(); 
      
-     // Re-render pages
      renderHomePage();
      renderTrackPage();
 }
@@ -784,7 +836,6 @@ async function stopTimer() {
      timerBanner.classList.add('closing');
      timerBanner.classList.remove('active');
 
-     // Re-render pages
      renderHomePage(); 
      renderTrackPage();
 
@@ -817,7 +868,6 @@ async function stopTimer() {
              const newLog = { ...timeLog, id: docRef.id };
              allTimeLogs.unshift(newLog); // Add to local cache
              
-             // *** NEW CRITICAL LOGIC ***
              if (timeLog.timerType === 'task') {
                 const task = plannerItems.get(timeLog.activityId);
                 if (task) {
@@ -828,9 +878,11 @@ async function stopTimer() {
              }
              
              if (pages.analysis.classList.contains('active')) {
-                loadAnalysisData(); // Reload analysis
+                loadAnalysisData(); 
              }
-             // Re-render pages
+             if (pages.categories.classList.contains('active')) { // NEW
+                renderCategoriesPage();
+             }
              renderTrackPage();
              renderHomePage(); 
         } catch (error) {
@@ -861,8 +913,15 @@ function updateTimerUI() {
      const elapsedMs = Date.now() - currentTimer.startTime;
      const timeString = formatHHMMSS(elapsedMs);
      
-     // 1. Banner
-     bannerTime.textContent = timeString; 
+     // 1. Banner (Hide on home page)
+     if (pages.home.classList.contains('active')) {
+        timerBanner.classList.remove('active');
+        timerBanner.classList.add('closing');
+     } else {
+        timerBanner.classList.add('active');
+        timerBanner.classList.remove('closing');
+        bannerTime.textContent = timeString; 
+     }
      
      // 2. Home Card
      if (pages.home.classList.contains('active')) {
@@ -871,15 +930,12 @@ function updateTimerUI() {
      
      // 3. Track Page (if list view)
      if (pages.track.classList.contains('active') && currentTrackView === 'list') {
-        const timerType = currentTimer.timerType === 'task' ? 'task' : (currentTimer.timerType === 'activity' ? 'activity' : null);
-        if (timerType) {
-            // Find the running item
-            const runningItemEl = trackContentArea.querySelector(`.track-item-action-btn.stop[data-id="${currentTimer.activityId}"][data-type="${timerType}"]`);
-            if (runningItemEl) {
-                const timerEl = runningItemEl.querySelector('.track-item-timer');
-                if (timerEl) {
-                    timerEl.textContent = timeString.substring(3); // MM:SS
-                }
+        const timerType = currentTimer.timerType === 'task' ? 'task' : 'activity';
+        const runningItemEl = trackContentArea.querySelector(`.track-item-action-btn.stop[data-id="${currentTimer.activityId}"][data-type="${timerType}"]`);
+        if (runningItemEl) {
+            const timerEl = runningItemEl.querySelector('.track-item-timer');
+            if (timerEl) {
+                timerEl.textContent = timeString.substring(3); // MM:SS
             }
         }
      }
