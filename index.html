@@ -113,11 +113,9 @@
         <div id="categories-page" class="page p-4">
             <datalist id="category-list-datalist"></datalist>
             
+            <!-- MODIFICATION: Removed add-category-btn from header -->
             <div class="flex justify-between items-center mb-6">
                 <h1 class="text-3xl font-bold">Categories</h1> 
-                <button id="add-category-btn" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
-                    <i class="bi bi-plus-lg text-2xl text-blue-600 dark:text-blue-400"></i>
-                </button>
             </div>
 
             <!-- Time Navigator -->
@@ -219,8 +217,11 @@
                 </button>
             </div>
             
+            <!-- MODIFICATION: Rearranged header controls -->
             <div class="flex items-center justify-between mb-4">
                 <button id="time-range-btn" class="text-lg font-semibold text-blue-600 dark:text-blue-400">Today</button>
+                
+                <!-- NEW: Grouped controls on the right -->
                 <div class="flex items-center space-x-2">
                     <button id="time-nav-prev" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
@@ -228,10 +229,10 @@
                     <button id="time-nav-next" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                     </button>
+                    <button id="filter-btn" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM12 11a1 1 0 011-1h6a1 1 0 011 1v2a1 1 0 01-1 1h-6a1 1 0 01-1-1v-2zM6 11a1 1 0 011-1h.01a1 1 0 010 2H7a1 1 0 01-1-1zM18 18a1 1 0 011-1h.01a1 1 0 010 2H19a1 1 0 01-1-1zM6 18a1 1 0 011-1h6a1 1 0 011 1v2a1 1 0 01-1 1H7a1 1 0 01-1-1v-2z"></path></svg>
+                    </button>
                 </div>
-                <button id="filter-btn" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM12 11a1 1 0 011-1h6a1 1 0 011 1v2a1 1 0 01-1 1h-6a1 1 0 01-1-1v-2zM6 11a1 1 0 011-1h.01a1 1 0 010 2H7a1 1 0 01-1-1zM18 18a1 1 0 011-1h.01a1 1 0 010 2H19a1 1 0 01-1-1zM6 18a1 1 0 011-1h6a1 1 0 011 1v2a1 1 0 01-1 1H7a1 1 0 01-1-1v-2z"></path></svg>
-                </button>
             </div>
 
             <div id="track-content-area" class="space-y-4"></div>
@@ -413,8 +414,48 @@
                 <input type="hidden" id="add-item-id" value="">
                 <input type="hidden" id="add-item-type" value="goal">
 
-                <!-- Form content will be added by JS -->
-                <div id="add-item-form-content" class="space-y-4"></div>
+                <!-- Common fields for all types -->
+                <div id="add-item-common-fields" class="space-y-4">
+                    <!-- Name, Goal, Task, Deadline fields dynamically injected here -->
+                </div>
+
+                <!-- Date/Time container (hidden for 'goal') -->
+                <div id="add-item-date-container" class="space-y-4 hidden">
+                    <!-- Task: Start & End -->
+                    <div id="form-group-task" class="grid grid-cols-2 gap-4 hidden">
+                        <div>
+                            <label for="add-item-start-datetime" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Start Time</label>
+                            <input type="datetime-local" id="add-item-start-datetime" class="mt-1 block w-full p-3 border rounded-lg shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600">
+                        </div>
+                        <div>
+                            <label for="add-item-end-datetime" class="block text-sm font-medium text-gray-700 dark:text-gray-300">End Time</label>
+                            <input type="datetime-local" id="add-item-end-datetime" class="mt-1 block w-full p-3 border rounded-lg shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600">
+                        </div>
+                    </div>
+                    <!-- Deadline: Date & Time -->
+                    <div id="form-group-deadline" class="grid grid-cols-2 gap-4 hidden">
+                        <div>
+                            <label for="add-item-due-date" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Due Date</label>
+                            <input type="date" id="add-item-due-date" class="mt-1 block w-full p-3 border rounded-lg shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600">
+                        </div>
+                        <div>
+                            <label for="add-item-due-time" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Due Time</LAbel>
+                            <input type="time" id="add-item-due-time" class="mt-1 block w-full p-3 border rounded-lg shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notifications (hidden for 'goal') -->
+                <div id="form-group-notifications" class="hidden">
+                    <label for="add-item-notify" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Notify Me</label>
+                    <select id="add-item-notify" class="mt-1 block w-full p-3 border rounded-lg shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600">
+                        <option value="none">No notification</option>
+                        <option value="0">On the day</option>
+                        <option value="1">1 day before</option>
+                        <option value="3">3 days before</option>
+                        <option value="7">7 days before</option>
+                    </select>
+                </div>
                 
                 <div class="flex justify-between items-center pt-4">
                     <button type="button" id="delete-item-btn" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold transition" style="display: none;">Delete</button>
@@ -436,11 +477,11 @@
                 
                 <!-- Icon and Color Picker -->
                 <div class="flex items-center gap-3">
-                    <button type="button" id="add-category-icon-btn" class="w-20 h-20 rounded-full flex items-center justify-center text-4xl text-white" style="background-color: #3b82f6;">
+                    <button type="button" id="add-category-icon-btn" class="flex-grow h-16 rounded-lg flex items-center justify-center text-3xl" style="border: 2px dashed var(--border-color); color: var(--text-secondary); background-color: var(--bg-accent);">
                         <i id="add-category-icon-preview" class="bi bi-tag-fill"></i>
                     </button>
                     <input type="hidden" id="add-category-icon-name" value="bi-tag-fill">
-                    <input type="color" id="add-category-color" value="#3b82f6" title="Select category color" class="w-16 h-16">
+                    <input type="color" id="add-category-color-input" value="#3b82f6" title="Select category color" class="w-16 h-16">
                 </div>
 
                 <!-- Category Name -->
