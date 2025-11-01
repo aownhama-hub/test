@@ -2,9 +2,8 @@
 let categoriesDonutChart = null;
 // MODIFICATION: Replaced old time range with new object
 let currentCategoriesTimeRange = { 
-    type: 'today', // 'today', 'week', 'month', 'year', 'all', 'custom'
-    start: getStartOfDate(new Date()), 
-    end: getEndOfDate(new Date()) 
+    type: 'month', 
+    date: new Date() // The start of the month
 };
 
 // --- NEW V24: Render Categories Page ---
@@ -140,7 +139,8 @@ function getCategoriesDateRange() {
 // MODIFICATION: Logic copied from app-main.js and uses new IDs
 function updateCategoriesNavText() {
     const { type, start, end } = currentCategoriesTimeRange;
-    const btn = document.getElementById('categories-time-range-btn'); // Will be added in index.html
+    const btn = categoriesTimeRangeBtn; // Renamed ref
+
     if (!btn) return; // Guard clause until HTML is updated
 
     if (type === 'today') {
@@ -148,7 +148,10 @@ function updateCategoriesNavText() {
     } else if (type === 'week') {
         btn.textContent = `${formatDate(start)} - ${formatDate(end)}`; // DD/MM/YYYY - DD/MM/YYYY
     } else if (type === 'month') {
-        btn.textContent = `${String(start.getMonth() + 1).padStart(2, '0')}/${start.getFullYear()}`; // MM/YYYY
+        // MM/YYYY format
+        const month = String(start.getMonth() + 1).padStart(2, '0');
+        const year = start.getFullYear();
+        btn.textContent = `${month}/${year}`; 
     } else if (type === 'year') {
         btn.textContent = start.getFullYear().toString(); // YYYY
     } else if (type === 'all') {
@@ -167,21 +170,23 @@ function navigateCategories(direction) {
     let { type, start } = currentCategoriesTimeRange;
     let newStart = new Date(start);
 
-    if (type === 'today' || (type === 'custom' && currentCategoriesTimeRange.end.getTime() - start.getTime() <= 86400000)) {
-        newStart.setDate(newStart.getDate() + direction);
-        updateCategoriesTimeRange('custom', newStart, newStart);
-    } else if (type === 'week') {
+    // Default to 'month' if range type isn't supported for navigation
+    if (type !== 'week' && type !== 'month' && type !== 'year') {
+        type = 'month';
+        newStart = new Date(currentCategoriesTimeRange.date); // Use the date stored in state
+    }
+
+    if (type === 'week') {
         newStart.setDate(newStart.getDate() + (7 * direction));
         updateCategoriesTimeRange('week', newStart);
     } else if (type === 'month') {
+        // Need to set date to 1st to avoid overflow issues (e.g., navigating from Jan 31 to Feb)
         newStart.setDate(1); 
         newStart.setMonth(newStart.getMonth() + direction);
         updateCategoriesTimeRange('month', newStart);
     } else if (type === 'year') {
         newStart.setFullYear(newStart.getFullYear() + direction);
         updateCategoriesTimeRange('year', newStart);
-    } else {
-        return; // Don't map for 'all'
     }
     
     renderCategoriesPage(); // Re-render categories
@@ -216,8 +221,8 @@ function updateCategoriesTimeRange(rangeType, customStart = null, customEnd = nu
             end = getEndOfDate(end);
             break;
         case 'all':
-            start = new Date(2000, 0, 1);
-            end = new Date(2100, 0, 1);
+            start = getStartOfDate(new Date(2000, 0, 1));
+            end = getEndOfDate(new Date(2100, 0, 1));
             break;
         case 'custom':
             start = getStartOfDate(customStart);
@@ -228,6 +233,13 @@ function updateCategoriesTimeRange(rangeType, customStart = null, customEnd = nu
     currentCategoriesTimeRange.start = start;
     currentCategoriesTimeRange.end = end;
     
+    // Also update the date reference used for navigation
+    if (rangeType === 'today' || rangeType === 'custom') {
+        currentCategoriesTimeRange.date = new Date(start);
+    } else {
+        currentCategoriesTimeRange.date = new Date(start);
+    }
+
     updateCategoriesNavText(); // Update the button text
 }
 
@@ -240,10 +252,10 @@ function showAddCategoryModal(categoryId = null) {
     const title = document.getElementById('add-category-title');
     const nameInput = document.getElementById('add-category-name');
     const iconPreview = document.getElementById('add-category-icon-preview');
-    const iconValue = document.getElementById('add-category-icon-name'); // BUG FIX: ID was wrong
+    const iconValue = document.getElementById('add-category-icon-name'); 
     const colorInput = document.getElementById('add-category-color-input');
     const saveBtn = document.getElementById('save-add-category-btn');
-    const editIdInput = document.getElementById('add-category-id'); // BUG FIX: ID was wrong [cite: image_fbb2ca.png]
+    const editIdInput = document.getElementById('add-category-id'); // BUG FIX: Corrected ID here
 
     if (categoryId) {
         const category = categories.get(categoryId);
@@ -276,9 +288,9 @@ async function handleSaveCategory(e) {
     e.preventDefault();
     if (!userId) return;
 
-    const editId = document.getElementById('add-category-id').value; // BUG FIX: ID was wrong
+    const editId = document.getElementById('add-category-id').value; // Corrected ID here
     const name = document.getElementById('add-category-name').value.trim();
-    const iconName = document.getElementById('add-category-icon-name').value; // BUG FIX: ID was wrong
+    const iconName = document.getElementById('add-category-icon-name').value;
     const color = document.getElementById('add-category-color-input').value;
 
     if (!name) {
@@ -1163,4 +1175,3 @@ function exportToCSV() {
     link.click();
     document.body.removeChild(link);
 }
-
