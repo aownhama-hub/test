@@ -1,130 +1,260 @@
-// --- Activity CRUD (No changes, now called from Add Item Modal) ---
-// handleAddActivity is now called from handleAddItem
- async function handleAddActivity_Legacy(e) {
-     e.preventDefault();
-     // This function is now OBSOLETE, its logic is inside handleAddItem
-     // Keeping it here to show what it was replaced
-}
+// --- NEW V24: Category Page State ---
+let categoriesDonutChart = null;
+let currentCategoriesTimeRange = {
+    type: 'month',
+    date: new Date() // The start of the month
+};
 
-function handleActivityListClick(e) {
-     // This function is OBSOLETE, replaced by handleTrackListClick
-}
-
-// showEditActivityModal is now called from handleTrackListClick or showAddItemModal(editId)
- function showEditActivityModal() {
-    const activity = activities.get(activityToEditId); if (!activity) return;
-    editActivityNameInput_Input.value = activity.name; 
-    editActivityColorInput.value = activity.color;
-    editActivityEmojiBtn.textContent = activity.emoji || '👉';
-    editActivityEmojiValue.value = activity.emoji || '👉';
+// --- NEW V24: Render Categories Page ---
+function renderCategoriesPage() {
+    if (!userId) {
+        categoriesListContainer.innerHTML = `<p class="text-center text-muted">Please sign in.</p>`;
+        return;
+    }
     
-    editActivityCategory.value = activity.category || '';
-    const goal = activity.goal || { value: 0, period: 'none' };
-    editActivityGoalValueInput.value = goal.value || 0;
-    editActivityGoalPeriodInput.value = goal.period || 'none';
-    editActivityPin.checked = activity.isPinned || false; // MODIFIED
+    // 1. Set Date Navigator Text
+    updateCategoriesNavText();
     
-    editActivityModal.classList.add('active');
-}
-function hideEditActivityModal() { 
-    editActivityModal.classList.remove('active'); 
-    activityToEditId = null; 
+    // 2. Get logs for the current period
+    const { start, end } = getCategoriesDateRange();
+    const logsInRange = allTimeLogs.filter(log => 
+        log.startTime >= start.getTime() && log.startTime <= end.getTime() && log.timerType !== 'task'
+    );
+    
+    // 3. Calculate totals by Category
+    const totalsByCategory = new Map();
+    let totalTimeMs = 0;
+
+    logsInRange.forEach(log => {
+        const activity = activities.get(log.activityId);
+        const categoryId = activity?.categoryId || 'uncategorized';
+        
+        let currentTotal = totalsByCategory.get(categoryId) || 0;
+        currentTotal += log.durationMs;
+        totalsByCategory.set(categoryId, currentTotal);
+        
+        totalTimeMs += log.durationMs;
+    });
+
+    // 4. Get category objects and sort by time
+    const sortedCategoryData = Array.from(totalsByCategory.entries())
+        .map(([id, timeMs]) => {
+            const category = categories.get(id) || { id: 'uncategorized', name: 'Uncategorized', color: '#808080', iconName: 'bi-question-circle' };
+            return { ...category, timeMs };
+        })
+        .sort((a, b) => b.timeMs - a.timeMs);
+
+    // 5. Render Donut Chart
+    renderCategoriesDonutChart(sortedCategoryData, totalTimeMs);
+    
+    // 6. Render List
+    categoriesListContainer.innerHTML = '';
+    if (sortedCategoryData.length === 0) {
+        categoriesListContainer.innerHTML = `<p class="text-center text-muted">No time tracked for this period.</p>`;
+        return;
+    }
+
+    sortedCategoryData.forEach(cat => {
+        const percentage = totalTimeMs > 0 ? (cat.timeMs / totalTimeMs) * 100 : 0;
+        categoriesListContainer.innerHTML += `
+            <div class="category-list-item" data-id="${cat.id}">
+                <div class="category-icon-bg" style="background-color: ${cat.color}">
+                    <i class="bi ${cat.iconName}"></i>
+                </div>
+                <h4 class="category-list-name">${cat.name}</h4>
+                <span class="category-list-time">${formatShortDuration(cat.timeMs)}</span>
+                <div class="category-list-bar-bg">
+                    <div class="category-list-bar-fill" style="width: ${percentage}%; background-color: ${cat.color};"></div>
+                </div>
+                <span class="category-list-percent">${percentage.toFixed(0)}%</span>
+            </div>
+        `;
+    });
 }
 
-function handleDeleteActivityFromModal() {
-    if (activityToEditId) {
-        logToDelete = { id: activityToEditId, type: 'activity' };
-        showDeleteModal();
-        hideEditActivityModal(); 
+function renderCategoriesDonutChart(data, totalTimeMs) {
+    if (categoriesDonutChart) {
+        categoriesDonutChart.destroy();
+    }
+    
+    // Clear placeholder
+    categoriesChartContainer.innerHTML = ''; 
+    
+    if (data.length === 0) {
+        categoriesChartContainer.innerHTML = `<p class="text-center text-muted">No data for chart</p>`;
+        return;
+    }
+
+    // Add canvas and center text
+    categoriesChartContainer.innerHTML = `
+        <canvas id="categories-donut-chart"></canvas>
+        <div id="categories-chart-center-text">
+            <div id="categories-chart-total-time">${formatShortDuration(totalTimeMs)}</div>
+            <div id="categories-chart-label">Total Time</div>
+        </div>
+    `;
+
+    const ctx = document.getElementById('categories-donut-chart').getContext('2d');
+    categoriesDonutChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: data.map(d => d.name),
+            datasets: [{
+                data: data.map(d => d.timeMs),
+                backgroundColor: data.map(d => d.color),
+                borderWidth: 2,
+                borderColor: getComputedStyle(document.documentElement).getPropertyValue('--bg-primary').trim(),
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '70%',
+            plugins: {
+                legend: {
+                    display: false // We use the list below
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const valueMs = context.parsed;
+                            const percentage = totalTimeMs > 0 ? (valueMs / totalTimeMs) * 100 : 0;
+                            return `${label}: ${formatShortDuration(valueMs)} (${percentage.toFixed(0)}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function getCategoriesDateRange() {
+    const d = new Date(currentCategoriesTimeRange.date);
+    let start, end;
+    
+    if (currentCategoriesTimeRange.type === 'month') {
+        start = new Date(d.getFullYear(), d.getMonth(), 1);
+        end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    } else if (currentCategoriesTimeRange.type === 'year') {
+        start = new Date(d.getFullYear(), 0, 1);
+        end = new Date(d.getFullYear(), 11, 31);
+    } else { // 'all'
+        start = new Date(2000, 0, 1);
+        end = new Date(2100, 0, 1);
+    }
+    
+    return { start: getStartOfDate(start), end: getEndOfDate(end) };
+}
+
+function updateCategoriesNavText() {
+    const d = currentCategoriesTimeRange.date;
+    if (currentCategoriesTimeRange.type === 'month') {
+        categoriesNavText.textContent = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    } else if (currentCategoriesTimeRange.type === 'year') {
+        categoriesNavText.textContent = d.getFullYear().toString();
+    } else {
+        categoriesNavText.textContent = 'All Time';
     }
 }
 
-// handleSaveEditActivity is now OBSOLETE, logic moved to handleAddItem
-async function handleSaveEditActivity(e) {
-    e.preventDefault(); if (!activityToEditId) return;
-    // This logic is now inside handleAddItem when editId is present and type is 'activity'
+// --- NEW V24: Category CRUD Modals ---
+function showAddCategoryModal(categoryId = null) {
+    const form = document.getElementById('add-category-form');
+    form.reset();
     
-    // The old modal form is still used, so we keep this logic
-    const newName = editActivityNameInput_Input.value.trim(); 
-    const newColor = editActivityColorInput.value;
-    const newEmoji = editActivityEmojiValue.value.trim() || '👉';
-    const newCategory = editActivityCategory.value.trim() || 'Uncategorized'; // MODIFIED
-    const newGoal = {
-        value: parseFloat(editActivityGoalValueInput.value) || 0,
-        period: editActivityGoalPeriodInput.value || 'none'
-    };
-    const newIsPinned = editActivityPin.checked; // MODIFIED
+    const title = document.getElementById('add-category-title');
+    const nameInput = document.getElementById('add-category-name');
+    const iconPreview = document.getElementById('add-category-icon-preview');
+    const iconValue = document.getElementById('add-category-icon-value');
+    const colorInput = document.getElementById('add-category-color-input');
+    const saveBtn = document.getElementById('save-add-category-btn');
+    const editIdInput = document.getElementById('edit-category-id');
 
-    if (!newName) { alert("Name cannot be empty."); return; }
+    if (categoryId) {
+        const category = categories.get(categoryId);
+        if (!category) return;
+        
+        title.textContent = 'Edit Category';
+        saveBtn.textContent = 'Save Changes';
+        editIdInput.value = categoryId;
+        nameInput.value = category.name;
+        iconPreview.className = `bi ${category.iconName || 'bi-emoji-smile'}`;
+        iconValue.value = category.iconName || 'bi-emoji-smile';
+        colorInput.value = category.color || '#3b82f6';
+    } else {
+        title.textContent = 'Add New Category';
+        saveBtn.textContent = 'Save';
+        editIdInput.value = '';
+        iconPreview.className = 'bi bi-emoji-smile';
+        iconValue.value = 'bi-emoji-smile';
+        colorInput.value = '#3b82f6';
+    }
     
-    const originalActivity = activities.get(activityToEditId);
+    addCategoryModal.classList.add('active');
+}
+
+function hideAddCategoryModal() {
+    addCategoryModal.classList.remove('active');
+}
+
+async function handleSaveCategory(e) {
+    e.preventDefault();
+    if (!userId) return;
+
+    const editId = document.getElementById('edit-category-id').value;
+    const name = document.getElementById('add-category-name').value.trim();
+    const iconName = document.getElementById('add-category-icon-value').value;
+    const color = document.getElementById('add-category-color-input').value;
+
+    if (!name) {
+        alert("Please enter a category name.");
+        return;
+    }
+
+    const categoryData = { name, iconName, color };
     
-    const updatedActivity = { 
-        ...originalActivity, 
-        name: newName, 
-        color: newColor, 
-        emoji: newEmoji, 
-        id: activityToEditId,
-        category: newCategory, 
-        goal: newGoal, 
-        isPinned: newIsPinned 
-    };
-    
-    const saveBtn = document.getElementById('save-edit-activity-btn');
-    const oldBtnText = saveBtn.textContent;
+    saveAddCategoryBtn.disabled = true;
+    saveAddCategoryBtn.textContent = 'Saving...';
 
     try {
-        saveBtn.textContent = 'Saving...';
-        saveBtn.disabled = true;
-
-        await activitiesCollection().doc(activityToEditId).set(updatedActivity, { merge: true }); 
-        activities.set(activityToEditId, updatedActivity);
-        await updateAssociatedLogs(activityToEditId, newName, newColor);
-        
-        await loadActivities(); // Full reload
-        renderTrackPage();
-        renderHomePage();
-        if (pages.analysis.classList.contains('active')) {
-            loadAnalysisData();
+        if (editId) {
+            await categoriesCollection().doc(editId).update(categoryData);
+            categories.set(editId, { ...categoryData, id: editId });
+        } else {
+            const docRef = await categoriesCollection().add(categoryData);
+            categories.set(docRef.id, { ...categoryData, id: docRef.id });
         }
-        hideEditActivityModal();
-         
-    } catch (error) { 
-        console.error("Error updating activity: ", error); 
-        alert("Update failed."); 
+        
+        hideAddCategoryModal();
+        renderCategoriesPage(); // Re-render the categories list
+        populateCategoryDatalist(); // Update datalist for activities
+    } catch (error) {
+        console.error("Error saving category: ", error);
+        alert("Failed to save category.");
     } finally {
-        saveBtn.textContent = oldBtnText;
-        saveBtn.disabled = false;
+        saveAddCategoryBtn.disabled = false;
     }
 }
 
-async function updateAssociatedLogs(activityId, newName, newColor) {
-     if (!userId) return;
-     const batchSize = 100; let query = timeLogsCollection().where('activityId', '==', activityId).where('timerType', '!=', 'task');
-     try {
-         let snapshot = await query.limit(batchSize).get();
-         while (snapshot.size > 0) {
-             const batch = db.batch(); snapshot.docs.forEach(doc => { batch.update(doc.ref, { activityName: newName, activityColor: newColor }); });
-             await batch.commit(); if (snapshot.size < batchSize) break;
-             const lastDoc = snapshot.docs[snapshot.size - 1]; snapshot = await query.startAfter(lastDoc).limit(batchSize).get();
-         }
-         // Update local cache
-         allTimeLogs.forEach(log => {
-             if (log.activityId === activityId && log.timerType !== 'task') {
-                 log.activityName = newName;
-                 log.activityColor = newColor;
-             }
-         });
-     } catch (error) { console.error("Batch update logs error: ", error); }
-}
 
 // --- Log CRUD & Modals (MODIFIED) ---
 function showDeleteModal() {
      let text = "Are you sure?";
-     if (logToDelete.type === 'activity') { text = "Delete activity? All associated logs will be removed."; }
-     else if (logToDelete.type === 'log') { text = "Delete this time log?"; }
-     else if (logToDelete.type === 'plannerItem') { text = "Delete this item? If it's a task, all its tracked time will also be deleted."; } // MODIFIED
-     deleteModalText.textContent = text; deleteModal.classList.add('active');
+     if (logToDelete.type === 'category') { // NEW
+        text = "Delete category? All associated activities and logs will be permanently removed.";
+     }
+     else if (logToDelete.type === 'activity') {
+         text = "Delete activity? All associated logs will be removed.";
+     }
+     else if (logToDelete.type === 'log') { 
+         text = "Delete this time log?";
+     }
+     else if (logToDelete.type === 'plannerItem') { 
+         text = "Delete this item? If it's a task, all its tracked time will also be deleted."; 
+     }
+     deleteModalText.textContent = text; 
+     deleteModal.classList.add('active');
 }
 function hideDeleteModal() { deleteModal.classList.remove('active'); logToDelete = { id: null, type: null }; }
 
@@ -132,8 +262,15 @@ function hideDeleteModal() { deleteModal.classList.remove('active'); logToDelete
 async function handleConfirmDelete() {
     if (!logToDelete.id || !logToDelete.type || !userId) return;
     try {
-        if (logToDelete.type === 'activity') {
-            // This logic is unchanged
+        if (logToDelete.type === 'category') {
+            // TODO: Implement category deletion logic
+            // 1. Delete category
+            // 2. Find all activities with this categoryId
+            // 3. For each activity, delete it
+            // 4. For each activity, delete all its logs
+            alert("Category deletion not fully implemented yet.");
+        
+        } else if (logToDelete.type === 'activity') {
             const deletedActivityId = logToDelete.id;
             await activitiesCollection().doc(deletedActivityId).delete();
             const logsSnapshot = await timeLogsCollection().where('activityId', '==', deletedActivityId).get();
@@ -148,7 +285,6 @@ async function handleConfirmDelete() {
             if(logDetailsModal.classList.contains('active')) { showLogDetailsModal(); }
         
         } else if (logToDelete.type === 'log') {
-            // This logic is unchanged
             const deletedLogId = logToDelete.id; 
             await timeLogsCollection().doc(deletedLogId).delete();
             analysisLogs = analysisLogs.filter(log => log.id !== deletedLogId);
@@ -158,7 +294,6 @@ async function handleConfirmDelete() {
             if (logDetailsList.children.length === 0) logDetailsList.innerHTML = `<p class="text-center text-muted">No logs for this period.</p>`;
             loadAnalysisData();
         
-        // *** NEW CRITICAL LOGIC ***
         } else if (logToDelete.type === 'plannerItem') {
             const deletedItemId = logToDelete.id;
             const item = plannerItems.get(deletedItemId);
@@ -166,7 +301,6 @@ async function handleConfirmDelete() {
             await plannerCollection().doc(deletedItemId).delete();
             plannerItems.delete(deletedItemId);
 
-            // If it was a task, delete all associated time logs
             if (item && item.type === 'task') {
                 const logsSnapshot = await timeLogsCollection()
                     .where('activityId', '==', deletedItemId)
@@ -177,7 +311,6 @@ async function handleConfirmDelete() {
                     const batch = db.batch();
                     logsSnapshot.forEach(doc => batch.delete(doc.ref));
                     await batch.commit();
-                    // Remove from local cache
                     allTimeLogs = allTimeLogs.filter(log => !(log.activityId === deletedItemId && log.timerType === 'task'));
                     console.log(`Deleted ${logsSnapshot.size} associated task logs.`);
                 }
@@ -187,6 +320,7 @@ async function handleConfirmDelete() {
         // Re-render all
         renderHomePage();
         renderTrackPage();
+        renderCategoriesPage(); // NEW
 
     } catch (error) { 
         console.error("Error deleting item: ", error); 
@@ -230,6 +364,7 @@ async function handleSaveManualEntry(e) {
          
          renderTrackPage(); 
          renderHomePage(); 
+         renderCategoriesPage(); // NEW
          if(pages.analysis.classList.contains('active')) {
             loadAnalysisData();
          }
@@ -280,7 +415,6 @@ async function handleSaveEditLog(e) {
      const updatedData = { startTime: startMs, endTime: endMs, durationMs: durMs, notes: notes };
      try {
          await timeLogsCollection().doc(logToEditId).update(updatedData);
-         // Update local caches
          const updateCache = (log) => {
              if (log.id === logToEditId) {
                  return { ...log, ...updatedData };
@@ -293,6 +427,7 @@ async function handleSaveEditLog(e) {
          hideEditLogModal(); 
          renderTrackPage();
          renderHomePage();
+         renderCategoriesPage(); // NEW
          if (logDetailsModal.classList.contains('active')) showLogDetailsModal();
          if (pages.analysis.classList.contains('active')) renderAnalysisVisuals(analysisLogs, calculateActivityTotals(analysisLogs));
      } catch (error) { console.error("Error updating log: ", error); alert("Update failed."); }
@@ -380,10 +515,10 @@ function patchActivitiesFromLogs(logs) {
                 id: log.activityId,
                 name: log.activityName || "Unknown Activity",
                 color: log.activityColor || "#808080",
-                category: "Uncategorized", 
+                iconName: 'bi-question-circle', // NEW
+                categoryId: 'uncategorized', // NEW
                 goal: { value: 0, period: 'none' }, 
-                order: Infinity,
-                isPinned: false
+                order: Infinity
             });
             newActivitiesFound = true;
         }
@@ -395,7 +530,6 @@ async function loadAnalysisData() {
     if (!userId) return; 
     const { startDate, endDate } = getAnalysisDateRange();
     
-    // Use the allTimeLogs cache instead of fetching
     analysisLogs = allTimeLogs.filter(log => 
         log.startTime >= startDate.getTime() && log.startTime <= endDate.getTime()
     );
@@ -410,51 +544,50 @@ async function loadAnalysisData() {
     renderAnalysisVisuals(analysisLogs, activityTotals); 
 }
 
-// MODIFIED: calculateActivityTotals (prefix task names)
+// MODIFIED: calculateActivityTotals (group by CATEGORY)
 function calculateActivityTotals(logs) {
-    const activityTotals = new Map();
+    const categoryTotals = new Map();
+    
     logs.forEach(log => {
-        let color, name;
+        let category, categoryId;
         
-        // *** NEW LOGIC ***
         if (log.timerType === 'task') {
-            const task = plannerItems.get(log.activityId);
-            name = `Task: ${task?.name || log.activityName || 'Unknown'}`;
-            color = '#808080'; // Generic color for all tasks
+            categoryId = 'task'; // Group all tasks together
+            category = { name: 'Tasks', color: '#808080' };
         } else {
             const activity = activities.get(log.activityId);
-            name = activity?.name || log.activityName || 'Unknown';
-            color = activity?.color || log.activityColor || '#808080';
+            categoryId = activity?.categoryId || 'uncategorized';
+            category = categories.get(categoryId) || { name: 'Uncategorized', color: '#808080' };
         }
         
-        const current = activityTotals.get(name) || { durationMs: 0, color: color };
+        const current = categoryTotals.get(categoryId) || { durationMs: 0, name: category.name, color: category.color };
         current.durationMs += log.durationMs; 
-        current.color = color; 
-        activityTotals.set(name, current);
+        categoryTotals.set(categoryId, current);
     });
-    return activityTotals;
+    return categoryTotals;
 }
 
- function renderAnalysisRanking(activityTotals) {
+// MODIFIED: renderAnalysisRanking (group by CATEGORY)
+ function renderAnalysisRanking(categoryTotals) {
      let titleView = currentAnalysisView.charAt(0).toUpperCase() + currentAnalysisView.slice(1);
      rankingTitle.textContent = titleView + ' Ranking';
      rankingList.innerHTML = ''; 
-     if (activityTotals.size === 0) { 
+     if (categoryTotals.size === 0) { 
          rankingList.innerHTML = `<p class="text-center text-muted">No time tracked.</p>`; 
          return; 
      } 
-     const sorted = [...activityTotals.entries()].sort((a, b) => b[1].durationMs - a[1].durationMs);
-     const maxTime = sorted[0][1].durationMs;
+     const sorted = [...categoryTotals.values()].sort((a, b) => b.durationMs - a.durationMs);
+     const maxTime = sorted[0].durationMs;
      if (maxTime <= 0) {
          rankingList.innerHTML = `<p class="text-center text-muted">No time tracked.</p>`; 
          return;
      }
-     sorted.forEach(([name, data]) => {
+     sorted.forEach((data) => {
          const percentage = (data.durationMs / maxTime) * 100;
          const itemHtml = `
             <div class="ranking-item">
                 <span class="ranking-item-dot" style="background-color: ${data.color}"></span>
-                <span class="ranking-item-name" title="${name}">${name}</span>
+                <span class="ranking-item-name" title="${data.name}">${data.name}</span>
                 <span class="ranking-item-time">${formatShortDuration(data.durationMs)}</span>
                 <div class="ranking-bar-bg">
                     <div class="ranking-bar-fill" style="width: ${percentage}%; background-color: ${data.color}"></div>
@@ -470,22 +603,21 @@ function renderAnalysisVisuals(rawLogs, activityTotals) {
      if (barChartInstance) { barChartInstance.destroy(); barChartInstance = null; }
      if (pieChartInstance) { pieChartInstance.destroy(); pieChartInstance = null; }
      
-     // *** NEW LOGIC: Filter out tasks from chart views ***
+     // Filter out tasks from chart views
      const activityLogs = rawLogs.filter(log => log.timerType !== 'task');
 
      switch (currentAnalysisView) {
         case 'daily':
             break;
         case 'weekly':
-            renderWeeklyChart(activityLogs, barChartCanvas.getContext('2d')); // Pass filtered logs
+            renderWeeklyChart(activityLogs, barChartCanvas.getContext('2d')); 
             break;
         case 'monthly':
-            renderMonthlyHeatmap(activityLogs); // Pass filtered logs
+            renderMonthlyHeatmap(activityLogs); 
             break;
      }
 }
 
-// MODIFIED: renderWeeklyChart (now receives pre-filtered logs)
 function renderWeeklyChart(activityLogs, barCtx) { 
     const selectedActivityId = analysisActivityFilter.value;
     const selectedActivityName = analysisActivityFilter.options[analysisActivityFilter.selectedIndex].text;
@@ -500,8 +632,9 @@ function renderWeeklyChart(activityLogs, barCtx) {
     filteredLogs.forEach(log => {
         let dayIndex = new Date(log.startTime).getDay();
         dayIndex = (dayIndex === 0) ? 6 : (dayIndex - 1); 
-        const activityName = activities.get(log.activityId)?.name || log.activityName;
-        const color = activities.get(log.activityId)?.color || log.activityColor || '#808080';
+        const activity = activities.get(log.activityId);
+        const activityName = activity?.name || log.activityName;
+        const color = activity?.color || log.activityColor || '#808080';
         let entry = dataByActivity.get(activityName);
         if (!entry) {
             entry = { color: color, data: [0, 0, 0, 0, 0, 0, 0] };
@@ -540,7 +673,6 @@ function renderWeeklyChart(activityLogs, barCtx) {
     });
 }
 
-// MODIFIED: renderMonthlyHeatmap (now receives pre-filtered logs)
 function renderMonthlyHeatmap(activityLogs) { 
     heatmapGrid.innerHTML = ''; 
     const { startDate, endDate } = getAnalysisDateRange();
@@ -559,7 +691,7 @@ function renderMonthlyHeatmap(activityLogs) {
         hoursByDay.set(day, (hoursByDay.get(day) || 0) + hours);
     });
     
-    const maxHours = Math.max(0, ...hoursByDay.values()); // Get max for this specific filter
+    const maxHours = Math.max(0, ...hoursByDay.values());
     
     let firstDayIndex = firstDayOfMonth.getDay();
     firstDayIndex = (firstDayIndex === 0) ? 6 : (firstDayIndex - 1); 
@@ -575,13 +707,14 @@ function renderMonthlyHeatmap(activityLogs) {
     }
 }
 
-// getHeatmapLevel is replaced by the one in renderTrackGrid, but we need one for Analysis
-// Using the old one:
-function getHeatmapLevel_Analysis(hours) {
+// getHeatmapLevel is replaced by the one in renderTrackGrid
+function getHeatmapLevel(hours, maxHours) {
     if (hours <= 0) return 0;
-    if (hours < 1) return 1;
-    if (hours < 3) return 2;
-    if (hours < 5) return 3;
+    if (maxHours <= 0) return 1; // Avoid division by zero
+    const ratio = hours / maxHours;
+    if (ratio < 0.25) return 1;
+    if (ratio < 0.5) return 2;
+    if (ratio < 0.75) return 3;
     return 4;
 }
 
@@ -657,14 +790,7 @@ function handleLogDetailsClick(e) {
 }
 
 // --- Old Planner Functions (DELETED) ---
-// handlePlannerTabClick
-// toggleTargetHours
-// handleAddPlannerItem
-// handlePlannerListClick
-// handlePlannerItemDelete
-// renderPlannerPage
-// renderPlannerItem
-// --- All DELETED ---
+// ... All deleted ...
 
 // --- NEW Modal Functions ---
 
@@ -673,33 +799,41 @@ function showAddItemModal(itemIdToEdit = null) {
     addItemForm.reset();
     addItemForm.dataset.editId = '';
     
-    let formHtml = `
+    // --- 1. Get all element references ---
+    const itemTypeInput = addItemForm.querySelector('#add-item-type');
+    const typeButtons = addItemForm.querySelectorAll('.add-item-type-btn');
+    const commonFieldsContainer = addItemForm.querySelector('#add-item-common-fields');
+    const dateContainer = addItemForm.querySelector('#add-item-date-container');
+    const taskDateGroup = addItemForm.querySelector('#form-group-task');
+    const deadlineDateGroup = addItemForm.querySelector('#form-group-deadline');
+    const notifyGroup = addItemForm.querySelector('#form-group-notifications');
+    const saveBtn = addItemForm.querySelector('#save-add-item-btn');
+    
+    // --- 2. Dynamically build form HTML ---
+    commonFieldsContainer.innerHTML = `
         <input type="hidden" id="add-item-id" value="${itemIdToEdit || ''}">
+        
+        <!-- Name -->
         <div>
-            <label for="add-item-type" class="block text-sm font-medium mb-2">Item Type</label>
-            <select id="add-item-type" class="w-full p-3 border rounded-lg shadow-sm">
-                <option value="activity">Activity (for Goal)</option>
-                <option value="task">Task (Trackable)</option>
-                <option value="deadline">Deadline (Checklist)</option>
-            </select>
-        </div>
-
-        <!-- Common Fields -->
-        <div id="form-group-name">
             <label for="add-item-name" class="block text-sm font-medium mb-2">Name</label>
             <input type="text" id="add-item-name" placeholder="E.g., Finish report" class="w-full" maxlength="40">
         </div>
-        
-        <!-- Activity Fields -->
-        <div id="form-group-activity" class="space-y-4 hidden">
+
+        <!-- Activity/Goal Fields (Icon, Color, Category, Goal) -->
+        <div id="form-group-goal" class="space-y-4 hidden">
             <div class="flex gap-2">
-                <button type="button" id="add-item-emoji" class="p-3 emoji-input-btn" title="Select Emoji">😀</button>
-                <input type="hidden" id="add-item-emoji-value" value="😀">
-                <input type="color" id="add-item-color" value="#3b82f6" title="Select activity color">
+                <button type="button" id="add-item-icon-btn" class="icon-input-btn p-3" title="Select Icon">
+                    <i id="add-item-icon-preview" class="bi bi-emoji-smile"></i>
+                </button>
+                <input type="hidden" id="add-item-icon-value" value="bi-emoji-smile">
+                <input type="color" id="add-item-color" value="#3b82f6" title="Select activity color" class="w-16 h-16">
             </div>
             <div>
                 <label for="add-item-category" class="block text-sm font-medium mb-2">Category</label>
-                <input type="text" id="add-item-category" placeholder="E.g., Work" class="w-full" maxlength="20" list="category-list-datalist">
+                <select id="add-item-category" class="w-full">
+                    <option value="uncategorized">No Category</option>
+                    ${Array.from(categories.values()).map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+                </select>
             </div>
             <div>
                 <label class="block text-sm font-medium mb-2">Goal</label>
@@ -716,85 +850,102 @@ function showAddItemModal(itemIdToEdit = null) {
             </div>
         </div>
 
-        <!-- Task/Deadline Fields -->
-        <div id="form-group-planner" class="space-y-4 hidden">
-             <div>
-                <label for="add-item-due-date" class="block text-sm font-medium mb-2">Due Date</label>
-                <input type="date" id="add-item-due-date" class="w-full">
-            </div>
-            <div id="form-group-task-only" class="hidden">
+        <!-- Task Fields -->
+        <div id="form-group-task-only" class="space-y-4 hidden">
+            <div>
                 <label for="add-item-target-hours" class="block text-sm font-medium mb-2">Target (Hours)</label>
                 <input type="number" id="add-item-target-hours" min="0" step="0.5" placeholder="E.g., 4" class="w-full">
             </div>
-             <div id="form-group-deadline-only" class="hidden">
+        </div>
+
+        <!-- Deadline Fields -->
+        <div id="form-group-deadline-only" class="space-y-4 hidden">
+             <div>
                 <label for="add-item-notes" class="block text-sm font-medium mb-2">Notes (Optional)</label>
                 <textarea id="add-item-notes" rows="2" class="w-full"></textarea>
             </div>
         </div>
     `;
-    
-    // Inject form HTML, excluding buttons
-    addItemForm.innerHTML = formHtml + addItemForm.innerHTML.substring(addItemForm.innerHTML.indexOf('<div class="flex justify-end'));
-    
-    // Add event listener for the new emoji button
-    document.getElementById('add-item-emoji').addEventListener('click', () => {
-        showEmojiPicker(document.getElementById('add-item-emoji'), document.getElementById('add-item-emoji-value'));
+
+    // --- 3. Add Event Listeners (must be done *after* innerHTML) ---
+    addItemForm.querySelector('#add-item-icon-btn').addEventListener('click', () => {
+        showIconPicker(
+            addItemForm.querySelector('#add-item-icon-btn'), 
+            addItemForm.querySelector('#add-item-icon-value'),
+            addItemForm.querySelector('#add-item-icon-preview')
+        );
     });
     
-    // Add event listener for type change
-    const itemTypeSelect = document.getElementById('add-item-type');
-    itemTypeSelect.addEventListener('change', toggleAddItemForm);
+    typeButtons.forEach(btn => btn.addEventListener('click', (e) => {
+        const type = e.target.dataset.type;
+        itemTypeInput.value = type;
+        toggleAddItemForm(type);
+    }));
 
+    // --- 4. Populate Form if Editing ---
+    let itemType = 'goal'; // Default for adding
+    
     if (itemIdToEdit) {
-        // This is an edit
         addItemForm.dataset.editId = itemIdToEdit;
-        saveAddItemBtn.textContent = 'Save Changes';
+        saveBtn.textContent = 'Save Changes';
         
-        // Try to find as planner item first
         const plannerItem = plannerItems.get(itemIdToEdit);
+        const activity = activities.get(itemIdToEdit);
+
         if (plannerItem) {
-            itemTypeSelect.value = plannerItem.type; // 'task' or 'deadline'
+            // It's a Task or Deadline
+            itemType = plannerItem.type;
             document.getElementById('add-item-name').value = plannerItem.name;
-            document.getElementById('add-item-due-date').value = plannerItem.dueDate;
-            if (plannerItem.type === 'task') {
+            notifyGroup.querySelector('#add-item-notify').value = plannerItem.notifyDays || 'none';
+            
+            if (itemType === 'task') {
                 document.getElementById('add-item-target-hours').value = plannerItem.targetHours || '';
+                // TODO: Populate datetime-local
             } else { // deadline
                 document.getElementById('add-item-notes').value = plannerItem.notes || '';
+                // TODO: Populate date and time
             }
-        } else {
-            // Not a planner item, must be an activity (goal)
-            const activity = activities.get(itemIdToEdit);
-            if (activity) {
-                itemTypeSelect.value = 'activity';
-                document.getElementById('add-item-name').value = activity.name;
-                document.getElementById('add-item-emoji').textContent = activity.emoji || '😀';
-                document.getElementById('add-item-emoji-value').value = activity.emoji || '😀';
-                document.getElementById('add-item-color').value = activity.color || '#3b82f6';
-                document.getElementById('add-item-category').value = activity.category || '';
-                document.getElementById('add-item-goal-value').value = activity.goal?.value || '';
-                document.getElementById('add-item-goal-period').value = activity.goal?.period || 'none';
-            }
+        } else if (activity) {
+            // It's a Goal
+            itemType = 'goal';
+            document.getElementById('add-item-name').value = activity.name;
+            document.getElementById('add-item-icon-preview').className = `bi ${activity.iconName || 'bi-emoji-smile'}`;
+            document.getElementById('add-item-icon-value').value = activity.iconName || 'bi-emoji-smile';
+            document.getElementById('add-item-color').value = activity.color || '#3b82f6';
+            document.getElementById('add-item-category').value = activity.categoryId || 'uncategorized';
+            document.getElementById('add-item-goal-value').value = activity.goal?.value || '';
+            document.getElementById('add-item-goal-period').value = activity.goal?.period || 'none';
         }
-        itemTypeSelect.disabled = true; // Don't allow changing type when editing
+        
     } else {
         // This is an add
-        saveAddItemBtn.textContent = 'Add Item';
-        document.getElementById('add-item-due-date').value = getTodayString();
-        itemTypeSelect.disabled = false;
+        saveBtn.textContent = 'Add Item';
+        // TODO: Set default date/time values
     }
 
-    toggleAddItemForm(); // Set initial visibility
+    // --- 5. Set Initial State & Show Modal ---
+    itemTypeInput.value = itemType;
+    toggleAddItemForm(itemType);
     addItemModal.classList.add('active');
 }
 
-function toggleAddItemForm() {
-    const type = document.getElementById('add-item-type').value;
-    
-    document.getElementById('form-group-activity').classList.toggle('hidden', type !== 'activity');
-    document.getElementById('form-group-planner').classList.toggle('hidden', type === 'activity');
+function toggleAddItemForm(type) {
+    // 1. Set Button Active State
+    addItemForm.querySelectorAll('.add-item-type-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.type === type);
+    });
+
+    // 2. Show/Hide Form Groups
+    document.getElementById('form-group-goal').classList.toggle('hidden', type !== 'goal');
     document.getElementById('form-group-task-only').classList.toggle('hidden', type !== 'task');
     document.getElementById('form-group-deadline-only').classList.toggle('hidden', type !== 'deadline');
+    
+    document.getElementById('add-item-date-container').classList.toggle('hidden', type === 'goal');
+    document.getElementById('form-group-task').classList.toggle('hidden', type !== 'task');
+    document.getElementById('form-group-deadline').classList.toggle('hidden', type !== 'deadline');
+    document.getElementById('form-group-notifications').classList.toggle('hidden', type === 'goal');
 }
+
 
 function hideAddItemModal() {
     addItemModal.classList.remove('active');
@@ -818,24 +969,22 @@ async function handleAddItem(e) {
     saveAddItemBtn.textContent = 'Saving...';
     
     try {
-        if (type === 'activity') {
+        if (type === 'goal') {
             const newActivity = {
                 name: name,
+                iconName: document.getElementById('add-item-icon-value').value || 'bi-emoji-smile',
                 color: document.getElementById('add-item-color').value,
-                emoji: document.getElementById('add-item-emoji-value').value || '😀',
-                category: document.getElementById('add-item-category').value.trim() || 'Uncategorized',
+                categoryId: document.getElementById('add-item-category').value,
                 goal: {
                     value: parseFloat(document.getElementById('add-item-goal-value').value) || 0,
                     period: document.getElementById('add-item-goal-period').value || 'none'
                 },
-                // Keep existing pin/order settings if editing
-                isPinned: editId ? activities.get(editId)?.isPinned : false,
-                order: editId ? activities.get(editId)?.order : (activities.size || 0)
+                order: editId ? (activities.get(editId)?.order || 0) : (activities.size || 0)
             };
 
             if (editId) {
                 await activitiesCollection().doc(editId).update(newActivity);
-                activities.set(editId, { ...newActivity, id: editId });
+                activities.set(editId, { ...activities.get(editId), ...newActivity });
             } else {
                 const docRef = await activitiesCollection().add(newActivity);
                 activities.set(docRef.id, { ...newActivity, id: docRef.id });
@@ -843,21 +992,23 @@ async function handleAddItem(e) {
             await loadActivities(); // Reload to refresh datalists etc.
 
         } else { // 'task' or 'deadline'
+            // TODO: Get start/due dates from new pickers
             const newPlannerItem = {
                 name: name,
                 type: type,
-                dueDate: document.getElementById('add-item-due-date').value,
+                dueDate: document.getElementById('add-item-due-date')?.value || getTodayString(), // Placeholder
+                // startDate: ...
+                notifyDays: document.getElementById('add-item-notify').value || 'none',
                 targetHours: type === 'task' ? (parseFloat(document.getElementById('add-item-target-hours').value) || 0) : 0,
                 notes: type === 'deadline' ? (document.getElementById('add-item-notes').value.trim()) : '',
-                // Keep existing completed/tracked status if editing
-                isCompleted: editId ? plannerItems.get(editId)?.isCompleted : false,
-                trackedDurationMs: editId ? plannerItems.get(editId)?.trackedDurationMs : 0,
-                createdAt: editId ? plannerItems.get(editId)?.createdAt : Date.now()
+                isCompleted: editId ? (plannerItems.get(editId)?.isCompleted || false) : false,
+                trackedDurationMs: editId ? (plannerItems.get(editId)?.trackedDurationMs || 0) : 0,
+                createdAt: editId ? (plannerItems.get(editId)?.createdAt || Date.now()) : Date.now()
             };
 
             if (editId) {
                 await plannerCollection().doc(editId).update(newPlannerItem);
-                plannerItems.set(editId, { ...newPlannerItem, id: editId });
+                plannerItems.set(editId, { ...plannerItems.get(editId), ...newPlannerItem });
             } else {
                 const docRef = await plannerCollection().add(newPlannerItem);
                 plannerItems.set(docRef.id, { ...newPlannerItem, id: docRef.id });
@@ -867,6 +1018,7 @@ async function handleAddItem(e) {
         hideAddItemModal();
         renderHomePage();
         renderTrackPage();
+        renderCategoriesPage(); // NEW
 
     } catch (error) {
         console.error("Error saving item: ", error);
@@ -877,134 +1029,38 @@ async function handleAddItem(e) {
 }
 
 
-// NEW: Time Range Modal
-function showTimeRangeModal() {
-    timeRangeModal.classList.add('active');
-}
-function hideTimeRangeModal() {
-    timeRangeModal.classList.remove('active');
-}
-function handleTimeRangeSelect(e) {
-    const range = e.target.dataset.range;
-    if (!range) return;
-    
-    if (range === 'custom') {
-        alert("Custom range selection is not yet implemented."); // Placeholder
-        return;
-    }
-    
-    updateTimeRange(range);
-    hideTimeRangeModal();
-    renderTrackPage();
-}
+// --- DELETED MODAL FUNCTIONS ---
+// showTimeRangeModal, hideTimeRangeModal, handleTimeRangeSelect
+// showFilterModal, hideFilterModal, applyFiltersAndClose
+// handleFilterTypeToggle, switchFilterTab, populateFilterLists
+// --- ALL DELETED ---
 
-// --- NEW Filter Modal Functions ---
-function showFilterModal() {
-    populateFilterLists();
-    filterModal.classList.add('active');
-}
-function hideFilterModal() {
-    filterModal.classList.remove('active');
-}
-
-function applyFiltersAndClose() {
-    // 1. Read Item Types
-    currentTrackFilters.types = [];
-    filterTypeContainer.querySelectorAll('.filter-toggle-btn.active').forEach(btn => {
-        currentTrackFilters.types.push(btn.dataset.type);
-    });
-
-    // 2. Read Activities
-    currentTrackFilters.activities = [];
-    filterListActivities.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
-        currentTrackFilters.activities.push(cb.dataset.id);
-    });
-    
-    // 3. Read Categories
-    currentTrackFilters.categories = [];
-    filterListCategories.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
-        currentTrackFilters.categories.push(cb.dataset.name);
-    });
-
-    hideFilterModal();
-    renderTrackPage();
-}
-
-function handleFilterTypeToggle(e) {
-    const btn = e.target.closest('.filter-toggle-btn');
-    if (btn) {
-        btn.classList.toggle('active');
-    }
-}
-
-function switchFilterTab(tab) {
-    if (tab === 'activities') {
-        filterTabActivities.classList.add('border-blue-600', 'text-blue-600');
-        filterTabActivities.classList.remove('text-gray-500');
-        filterTabCategories.classList.remove('border-blue-600', 'text-blue-600');
-        filterTabCategories.classList.add('text-gray-500');
-        filterListActivities.style.display = 'block';
-        filterListCategories.style.display = 'none';
-    } else {
-        filterTabActivities.classList.remove('border-blue-600', 'text-blue-600');
-        filterTabActivities.classList.add('text-gray-500');
-        filterTabCategories.classList.add('border-blue-600', 'text-blue-600');
-        filterTabCategories.classList.remove('text-gray-500');
-        filterListActivities.style.display = 'none';
-        filterListCategories.style.display = 'block';
-    }
-}
-
-function populateFilterLists() {
-    // 1. Populate Activities
-    filterListActivities.innerHTML = '';
-    const sortedActivities = Array.from(activities.values()).sort((a, b) => a.name.localeCompare(b.name));
-    sortedActivities.forEach(activity => {
-        const isChecked = currentTrackFilters.activities.includes(activity.id);
-        filterListActivities.innerHTML += `
-            <div class="filter-list-item">
-                <input type="checkbox" id="filter-act-${activity.id}" data-id="${activity.id}" ${isChecked ? 'checked' : ''}>
-                <label for="filter-act-${activity.id}">${activity.emoji || '🎯'} ${activity.name}</label>
-            </div>
-        `;
-    });
-
-    // 2. Populate Categories
-    filterListCategories.innerHTML = '';
-    const categories = new Set(Array.from(activities.values()).map(a => a.category || 'Uncategorized'));
-    const sortedCategories = Array.from(categories).sort((a, b) => a.localeCompare(b));
-    sortedCategories.forEach(category => {
-        const isChecked = currentTrackFilters.categories.includes(category);
-        filterListCategories.innerHTML += `
-            <div class="filter-list-item">
-                <input type="checkbox" id="filter-cat-${category}" data-name="${category}" ${isChecked ? 'checked' : ''}>
-                <label for="filter-cat-${category}">${category}</label>
-            </div>
-        `;
-    });
-}
-
-// --- Export to CSV (Unchanged) ---
+// --- Export to CSV (MODIFIED) ---
 function exportToCSV() {
     if (analysisLogs.length === 0) {
         alert("No data to export for this period.");
         return;
     }
     let csvContent = "data:text/csv;charset=utf-8,";
-    const headers = ["Activity", "Category", "Notes", "Date", "Start Time", "End Time", "Duration (Hours)"];
+    const headers = ["Item", "Category", "Type", "Notes", "Date", "Start Time", "End Time", "Duration (Hours)"];
     csvContent += headers.join(",") + "\r\n";
     const sortedLogs = [...analysisLogs].sort((a, b) => a.startTime - b.startTime);
     sortedLogs.forEach(log => {
-        let activityName, category;
+        let itemName, categoryName, itemType;
+        
         if (log.timerType === 'task') {
             const task = plannerItems.get(log.activityId);
-            activityName = `Task: ${task?.name || log.activityName}`;
-            category = "Planner Task";
+            itemName = task?.name || log.activityName;
+            categoryName = "Task";
+            itemType = "Task";
         } else {
             const activity = activities.get(log.activityId);
-            activityName = activity?.name || log.activityName;
-            category = activity?.category || 'Uncategorized';
+            itemName = activity?.name || log.activityName;
+            const category = categories.get(activity?.categoryId);
+            categoryName = category?.name || "Uncategorized";
+            itemType = "Activity";
         }
+        
         const notes = log.notes || "";
         const start = new Date(log.startTime);
         const end = new Date(log.endTime);
@@ -1012,9 +1068,11 @@ function exportToCSV() {
         const startTime = start.toLocaleTimeString('en-GB'); 
         const endTime = end.toLocaleTimeString('en-GB'); 
         const durationHours = (log.durationMs / 3600000).toFixed(4);
+        
         const row = [
-            `"${activityName.replace(/"/g, '""')}"`,
-            `"${category.replace(/"/g, '""')}"`, 
+            `"${itemName.replace(/"/g, '""')}"`,
+            `"${categoryName.replace(/"/g, '""')}"`, 
+            `"${itemType.replace(/"/g, '""')}"`, 
             `"${notes.replace(/"/g, '""')}"`,
             date,
             startTime,
