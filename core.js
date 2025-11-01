@@ -19,11 +19,10 @@ let googleProvider = null;
 // --- Global State ---
 let userId = null;
 let currentTimer = null;
+let categories = new Map(); // NEW: For V24
 let activities = new Map();
 let plannerItems = new Map(); // Planner items (tasks, deadlines)
 let allTimeLogs = []; // Cache for all logs, used by Track page
-// let todaysLogs = []; // This is now deprecated, logic moves to renderTrackList
-// globalSettings is removed
 let currentAnalysisView = 'daily'; 
 let currentAnalysisDate = new Date(); 
 let barChartInstance = null;
@@ -32,12 +31,9 @@ let analysisLogs = []; // Logs for the current analysis period
 let logToEditId = null;
 let logToDelete = { id: null, type: null };
 let activityToEditId = null;
-// draggedItemElement is removed
 let previousTimeString = "00:00:00"; 
 let currentEmojiInputTarget = null;
 let stopTimerCompletion = null; 
-// selectedGoalView is removed
-// currentPeriodLogTotals is removed
 
 // --- NEW Track Page State ---
 let currentTrackView = 'list'; // 'list' or 'grid'
@@ -59,33 +55,25 @@ const mainApp = document.getElementById('main-app');
 const pages = {
     home: document.getElementById('home-page'),
     track: document.getElementById('track-page'), 
-    // planner: DELETED
-    analysis: document.getElementById('analysis-page'),
-    settings: document.getElementById('settings-page')
+    categories: document.getElementById('categories-page'), // NEW
+    analysis: document.getElementById('analysis-page')
+    // settings: DELETED
 };
 const navButtons = document.querySelectorAll('.nav-btn');
-// activityListEl is DELETED
-// addActivityForm is DELETED
-// newActivityNameInput is DELETED
-// newActivityColorInput is DELETED
-// newActivityEmojiBtn is DELETED
-// newActivityEmojiValue is DELETED
-// newActivityCategoryInput is DELETED
-// addActivityBtn is DELETED
 const categoryDatalist = document.getElementById('category-list-datalist');
-// categoryFilter is DELETED
 
+// Settings page refs (now in modal)
+const settingsModal = document.getElementById('settings-modal'); // NEW
+const showSettingsBtn = document.getElementById('show-settings-btn'); // NEW
+const closeSettingsBtn = document.getElementById('close-settings-btn'); // NEW
 const themeToggleBtnSettings = document.getElementById('theme-toggle-btn-settings');
 const themeIconLightSettings = document.getElementById('theme-icon-light-settings');
 const themeIconDarkSettings = document.getElementById('theme-icon-dark-settings');
-
-// Settings page refs
 const fontSizeSlider = document.getElementById('font-size-slider');
 const signInBtn = document.getElementById('sign-in-btn');
 const signOutBtn = document.getElementById('sign-out-btn');
 const userInfo = document.getElementById('user-info');
 const userEmail = document.getElementById('user-email');
-// Removed global settings form refs
 
 // Home page refs
 const homeTimerCard = document.getElementById('home-timer-card'); 
@@ -95,12 +83,19 @@ const homeTimerTime = document.getElementById('home-timer-time');
 const homeTimerStopBtn = document.getElementById('home-timer-stop-btn'); 
 const generateAiSummaryBtn = document.getElementById('generate-ai-summary-btn'); 
 const aiSummaryContent = document.getElementById('ai-summary-content'); 
-const homeTodayList = document.getElementById('home-today-list'); // NEW
-// homeAgendaList, homeTasksList, homeDailyGoalsList are DELETED
+// NEW Home Card Refs
+const homeCardsContainer = document.getElementById('home-cards-container');
+const homeTodayCard = document.getElementById('home-today-card');
+const homeGoalsCard = document.getElementById('home-goals-card');
+const homeUpcomingCard = document.getElementById('home-upcoming-card');
+const homeNotificationsCard = document.getElementById('home-notifications-card');
+const homeTodayList = document.getElementById('home-today-list');
+const homeGoalsList = document.getElementById('home-goals-list');
+const homeUpcomingList = document.getElementById('home-upcoming-list');
+const homeNotificationsList = document.getElementById('home-notifications-list');
+const editHomeCardsBtn = document.getElementById('edit-home-cards-btn');
 
 // Track page refs
-// goalViewToggle is DELETED
-// NEW Track Page Refs
 const trackSearchBox = document.getElementById('search-box');
 const trackViewToggleBtn = document.getElementById('view-toggle-btn');
 const trackViewIconList = document.getElementById('view-toggle-icon-list');
@@ -108,10 +103,18 @@ const trackViewIconGrid = document.getElementById('view-toggle-icon-grid');
 const trackTimeRangeBtn = document.getElementById('time-range-btn');
 const trackTimeNavPrev = document.getElementById('time-nav-prev');
 const trackTimeNavNext = document.getElementById('time-nav-next');
-const trackFilterBtn = document.getElementById('filter-btn');
+const trackFilterBtn = document.getElementById('filter-btn'); // Note: Filter modal was removed, this button will be re-wired
 const trackContentArea = document.getElementById('track-content-area');
 
-// Planner Page Refs are DELETED
+// Categories page refs (NEW)
+const addCategoryBtn = document.getElementById('add-category-btn');
+const categoriesDateNavigator = document.getElementById('categories-date-navigator');
+const categoriesNavPrev = document.getElementById('categories-nav-prev');
+const categoriesNavNext = document.getElementById('categories-nav-next');
+const categoriesNavText = document.getElementById('categories-nav-text');
+const categoriesChartContainer = document.getElementById('categories-chart-container');
+const categoriesListContainer = document.getElementById('categories-list-container');
+
 
 const timerBanner = document.getElementById('timer-banner');
 const bannerActivityName = document.getElementById('banner-activity-name');
@@ -139,7 +142,6 @@ const saveStopNoteBtn = document.getElementById('save-stop-note-btn');
 const skipStopNoteBtn = document.getElementById('skip-stop-note-btn');
 
 const manualEntryModal = document.getElementById('manual-entry-modal');
-// showManualEntryBtn is DELETED
 const cancelManualEntryBtn = document.getElementById('cancel-manual-entry-btn');
 const manualEntryForm = document.getElementById('manual-entry-form');
 const manualActivitySelect = document.getElementById('manual-activity-select');
@@ -158,6 +160,7 @@ const editStartTimeInput = document.getElementById('edit-start-time');
 const editEndTimeInput = document.getElementById('edit-end-time');
 const editNotesInput = document.getElementById('edit-notes');
 
+// Old Edit Activity Modal (will be deprecated)
 const editActivityModal = document.getElementById('edit-activity-modal');
 const editActivityForm = document.getElementById('edit-activity-form');
 const cancelEditActivityBtn = document.getElementById('cancel-edit-activity-btn');
@@ -167,13 +170,12 @@ const editActivityColorInput = document.getElementById('edit-activity-color-inpu
 const editActivityEmojiBtn = document.getElementById('edit-activity-emoji-input'); 
 const editActivityEmojiValue = document.getElementById('edit-activity-emoji-value');
 const deleteActivityFromModalBtn = document.getElementById('delete-activity-from-modal-btn'); 
-
-// Edit Activity Modal refs for Goal/Pin/Category
-const editActivityCategory = document.getElementById('edit-activity-category'); // MODIFIED
+const editActivityCategory = document.getElementById('edit-activity-category'); 
 const editActivityGoalValueInput = document.getElementById('edit-activity-goal-value'); 
 const editActivityGoalPeriodInput = document.getElementById('edit-activity-goal-period'); 
-const editActivityPin = document.getElementById('edit-activity-pin'); // MODIFIED
+const editActivityPin = document.getElementById('edit-activity-pin'); 
 
+// Analysis page refs
 const analysisDateInput = document.getElementById('analysis-date');
 const analysisNavPrev = document.getElementById('analysis-nav-prev'); 
 const analysisNavNext = document.getElementById('analysis-nav-next'); 
@@ -186,27 +188,24 @@ const barChartTitle = document.getElementById('bar-chart-title');
 const pieChartCanvas = document.getElementById('analysis-pie-chart'); 
 const pieChartCard = document.getElementById('pie-chart-card'); 
 const analysisTabButtons = document.querySelectorAll('.analysis-tab-btn'); 
-
 const heatmapCard = document.getElementById('heatmap-card');
 const heatmapGrid = document.getElementById('heatmap-grid');
 const heatmapTitle = document.getElementById('heatmap-title');
-
 const analysisFilterContainer = document.getElementById('analysis-filter-container');
 const analysisActivityFilter = document.getElementById('analysis-activity-filter');
-
 const viewAllLogsBtn = document.getElementById('view-all-logs-btn');
 const logDetailsModal = document.getElementById('log-details-modal');
 const logDetailsList = document.getElementById('log-details-list');
 const closeLogDetailsBtn = document.getElementById('close-log-details-btn');
-
 const exportCsvBtn = document.getElementById('export-csv-btn');
 
+// Old Emoji Modal (will be deprecated)
 const emojiModal = document.getElementById('emoji-modal');
 const emojiGrid = document.getElementById('emoji-grid');
 const closeEmojiModalBtn = document.getElementById('close-emoji-modal-btn');
 const emojiCategories = document.getElementById('emoji-categories');
 
-// --- NEW Universal Add Button ---
+// --- Universal Add Button ---
 const universalAddBtn = document.getElementById('universal-add-btn');
 
 // --- NEW Modal Refs ---
@@ -215,16 +214,18 @@ const addItemForm = document.getElementById('add-item-form');
 const cancelAddItemBtn = document.getElementById('cancel-add-item-btn');
 const saveAddItemBtn = document.getElementById('save-add-item-btn');
 
-const timeRangeModal = document.getElementById('time-range-modal');
-const cancelTimeRangeBtn = document.getElementById('cancel-time-range-btn');
+// NEW V24 Refs
+const addCategoryModal = document.getElementById('add-category-modal');
+const cancelAddCategoryBtn = document.getElementById('cancel-add-category-btn');
+const addCategoryForm = document.getElementById('add-category-form');
+const saveAddCategoryBtn = document.getElementById('save-add-category-btn');
 
-const filterModal = document.getElementById('filter-modal');
-const closeFilterModalBtn = document.getElementById('close-filter-modal-btn');
-const filterTypeContainer = document.getElementById('filter-type-container');
-const filterTabActivities = document.getElementById('filter-tab-activities');
-const filterTabCategories = document.getElementById('filter-tab-categories');
-const filterListActivities = document.getElementById('filter-list-activities');
-const filterListCategories = document.getElementById('filter-list-categories');
+const iconPickerModal = document.getElementById('icon-picker-modal');
+const iconPickerGrid = document.getElementById('icon-picker-grid');
+const iconSearchInput = document.getElementById('icon-search');
+const closeIconPickerBtn = document.getElementById('close-icon-picker-btn');
+let currentIconInputTarget = null; // { button: buttonEl, value: inputEl, preview: iEl }
+
 
 // --- App Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -234,7 +235,8 @@ document.addEventListener('DOMContentLoaded', () => {
     authenticateUser(); 
     setDefaultAnalysisDate();
     setFlipClock("00:00:00"); 
-    populateEmojiPicker();
+    populateEmojiPicker(); // Old, will be replaced by populateIconPicker
+    populateIconPicker(); // NEW
     // Set default time range
     updateTimeRange('today');
 });
@@ -243,40 +245,30 @@ document.addEventListener('DOMContentLoaded', () => {
 function setupEventListeners() {
     navButtons.forEach(btn => btn.addEventListener('click', () => showPage(btn.dataset.page)));
     
-    // --- Removed Old Listeners ---
-    // addActivityForm.addEventListener('submit', handleAddActivity); // Replaced
-    // activityListEl.addEventListener('click', handleActivityListClick); // Replaced
-    // goalViewToggle.addEventListener('click', handleGoalViewToggle); // Replaced
-    // categoryFilter.addEventListener('change', () => renderActivityList()); // Replaced
-    // plannerTabContainer.addEventListener('click', handlePlannerTabClick); // Replaced
-    // addPlannerItemForm.addEventListener('submit', handleAddPlannerItem); // Replaced
-    // plannerItemType.addEventListener('change', toggleTargetHours); // Replaced
-    // plannerItemListContainer.addEventListener('click', handlePlannerListClick); // Replaced
-    // homeTasksList.addEventListener('click', handleHomeTaskListClick); // Replaced
-    // showManualEntryBtn.addEventListener('click', showManualEntryModal); // Replaced
-
-    // --- NEW Home Listeners ---
+    // --- Home Listeners ---
     homeTimerStopBtn.addEventListener('click', stopTimer); 
     generateAiSummaryBtn.addEventListener('click', handleGenerateAISummary); 
-    homeTodayList.addEventListener('click', handleHomeItemClick); // NEW
+    homeTodayList.addEventListener('click', handleHomeItemClick); 
 
-    // --- NEW Track Listeners ---
+    // --- Track Listeners ---
     trackSearchBox.addEventListener('input', () => {
         trackSearchQuery = trackSearchBox.value;
         renderTrackPage();
     });
     trackViewToggleBtn.addEventListener('click', handleViewToggle);
-    trackTimeRangeBtn.addEventListener('click', showTimeRangeModal);
+    // trackTimeRangeBtn.addEventListener('click', showTimeRangeModal); // DELETED
     trackTimeNavPrev.addEventListener('click', () => mapTimeRange(-1));
     trackTimeNavNext.addEventListener('click', () => mapTimeRange(1));
-    trackFilterBtn.addEventListener('click', showFilterModal);
+    // trackFilterBtn.addEventListener('click', showFilterModal); // DELETED
     trackContentArea.addEventListener('click', handleTrackListClick);
 
-    // --- NEW Universal Add Button ---
-    // **** THIS IS THE FIX ****
-    universalAddBtn.addEventListener('click', () => showAddItemModal()); // Wrapped in () => ... to prevent passing event
+    // --- Universal Add Button ---
+    universalAddBtn.addEventListener('click', () => showAddItemModal()); 
 
-    // --- Settings Listeners (Unchanged) ---
+    // --- Settings Modal Listeners (NEW) ---
+    showSettingsBtn.addEventListener('click', showSettingsModal);
+    closeSettingsBtn.addEventListener('click', hideSettingsModal);
+    addClickOutsideListener(settingsModal, hideSettingsModal);
     themeToggleBtnSettings.addEventListener('click', toggleTheme); 
     fontSizeSlider.addEventListener('input', handleFontSizeChange);
     signInBtn.addEventListener('click', signInWithGoogle);
@@ -299,7 +291,7 @@ function setupEventListeners() {
     closeLogDetailsBtn.addEventListener('click', hideLogDetailsModal);
     logDetailsList.addEventListener('click', handleLogDetailsClick);
 
-    // --- Edit Activity Listeners (Unchanged) ---
+    // --- Edit Activity Listeners (Old, will be deprecated) ---
     cancelEditActivityBtn.addEventListener('click', hideEditActivityModal);
     editActivityForm.addEventListener('submit', handleSaveEditActivity);
     deleteActivityFromModalBtn.addEventListener('click', handleDeleteActivityFromModal); 
@@ -317,7 +309,7 @@ function setupEventListeners() {
     
     // --- Core Modal Listeners (Modified) ---
     cancelDeleteBtn.addEventListener('click', hideDeleteModal);
-    confirmDeleteBtn.addEventListener('click', handleConfirmDelete); // Logic inside is updated
+    confirmDeleteBtn.addEventListener('click', handleConfirmDelete); 
     
     stopNoteForm.addEventListener('submit', handleSaveStopNote);
     skipStopNoteBtn.addEventListener('click', handleSaveStopNote);
@@ -341,21 +333,24 @@ function setupEventListeners() {
     cancelAddItemBtn.addEventListener('click', hideAddItemModal);
     addItemForm.addEventListener('submit', handleAddItem);
 
-    addClickOutsideListener(timeRangeModal, hideTimeRangeModal);
-    cancelTimeRangeBtn.addEventListener('click', hideTimeRangeModal);
-    timeRangeModal.addEventListener('click', handleTimeRangeSelect);
+    // --- DELETED Modal Listeners ---
+    // (timeRangeModal and filterModal listeners removed)
 
-    closeFilterModalBtn.addEventListener('click', applyFiltersAndClose);
-    filterTypeContainer.addEventListener('click', handleFilterTypeToggle);
-    filterTabActivities.addEventListener('click', () => switchFilterTab('activities'));
-    filterTabCategories.addEventListener('click', () => switchFilterTab('categories'));
-    // Checkbox clicks are handled by applyFiltersAndClose
-
-    // --- Emoji Picker Listeners (Unchanged) ---
-    // editActivityEmojiBtn is now a dynamic element, listener added in showAddItemModal
+    // --- Emoji Picker Listeners (Old) ---
     emojiCategories.addEventListener('click', handleEmojiCategorySelect);
     emojiGrid.addEventListener('click', handleEmojiSelect);
     closeEmojiModalBtn.addEventListener('click', hideEmojiPicker);
+
+    // --- NEW V24 Listeners ---
+    addCategoryBtn.addEventListener('click', () => showAddCategoryModal());
+    cancelAddCategoryBtn.addEventListener('click', hideAddCategoryModal);
+    addCategoryForm.addEventListener('submit', handleSaveCategory);
+    addClickOutsideListener(addCategoryModal, hideAddCategoryModal);
+
+    closeIconPickerBtn.addEventListener('click', hideIconPicker);
+    iconPickerGrid.addEventListener('click', handleIconSelect);
+    addClickOutsideListener(iconPickerModal, hideIconPicker);
+    iconSearchInput.addEventListener('input', populateIconPicker);
 }
 
 function addClickOutsideListener(modalElement, hideFunction) {
@@ -390,10 +385,10 @@ function setDefaultAnalysisDate() {
     currentAnalysisDate.setHours(0,0,0,0);
     analysisDateInput.value = getTodayString(); 
     manualDateInput.value = getTodayString(); 
-    // plannerItemDueDateInput.value = getTodayString(); // DELETED
 }
 
 // --- Auth & Data Loading (MODIFIED) ---
+const categoriesCollection = () => db.collection('users').doc(userId).collection('categories'); // NEW
 const activitiesCollection = () => db.collection('users').doc(userId).collection('activities');
 const timeLogsCollection = () => db.collection('users').doc(userId).collection('timeLogs');
 const plannerCollection = () => db.collection('users').doc(userId).collection('plannerItems');
@@ -411,6 +406,7 @@ function authenticateUser() {
 
             // Load all user data
             checkTimerRecovery(); 
+            await loadCategories(); // NEW: Load categories first
             await loadActivities(); 
             await loadPlannerItems();
             await loadAllTimeLogs(); // NEW: Load all logs into cache
@@ -423,6 +419,8 @@ function authenticateUser() {
                 renderTrackPage();
             } else if (activePage === 'analysis-page') {
                 await loadAnalysisData();
+            } else if (activePage === 'categories-page') { // NEW
+                renderCategoriesPage(); // This function will be in app-data.js
             }
         } else {
             userId = null;
@@ -449,16 +447,14 @@ function signOut() {
     });
 }
 
-// loadGlobalSettings() and handleSaveSettings() are DELETED
-
 // MODIFIED: Clear All User Data
 function clearAllUserData() {
     if (currentTimer) stopTimer(); 
+    categories.clear(); // NEW
     activities.clear();
-    plannerItems.clear(); // NEW
-    allTimeLogs = []; // NEW
+    plannerItems.clear(); 
+    allTimeLogs = []; 
     analysisLogs = [];
-    // currentPeriodLogTotals.clear(); // DELETED
     
     // Reset state
     currentTrackView = 'list';
@@ -541,6 +537,9 @@ function showPage(pageName) {
          if (pageName === 'track') {
             renderTrackPage();
          }
+         if (pageName === 'categories') { // NEW
+            renderCategoriesPage(); // This function will be in app-data.js
+         }
          if (pageName === 'analysis') {
             if (analysisLogs.length === 0) { // Only load if not already loaded
                  setDefaultAnalysisDate(); 
@@ -549,6 +548,21 @@ function showPage(pageName) {
          }
     } else {
         console.error("Tried to navigate to non-existent page:", pageName);
+    }
+}
+
+// NEW V24 Function: Load Categories
+async function loadCategories() {
+    if (!userId) return;
+    try {
+        const snapshot = await categoriesCollection().orderBy('name', 'asc').get(); 
+        categories.clear();
+        snapshot.forEach(doc => {
+             const data = { ...doc.data(), id: doc.id };
+             categories.set(doc.id, data);
+         });
+    } catch (error) { 
+         console.error("Error loading categories: ", error);
     }
 }
 
@@ -564,8 +578,6 @@ async function loadActivities() {
          
          populateAnalysisFilter(); 
          populateCategoryDatalist();
-         // populateCategoryFilter(); // DELETED
-         // setupDragAndDrop(activityListEl, activities, 'activity'); // DELETED
     } catch (error) { 
          console.error("Error loading activities: ", error);
     }
@@ -607,16 +619,14 @@ async function loadPlannerItems() {
     }
 }
 
-// Populate Category Datalist (Kept)
+// Populate Category Datalist (Now for Activities)
 function populateCategoryDatalist() {
     categoryDatalist.innerHTML = '';
-    const categories = new Set(Array.from(activities.values()).map(a => a.category).filter(c => c && c !== 'Uncategorized'));
+    // This will now be populated by the new Category objects
     categories.forEach(c => {
-        categoryDatalist.innerHTML += `<option value="${c}">`;
+        categoryDatalist.innerHTML += `<option value="${c.name}">`;
     });
 }
-
-// populateCategoryFilter() is DELETED
 
 function populateAnalysisFilter() {
     while (analysisActivityFilter.options.length > 1) {
@@ -632,7 +642,7 @@ function populateAnalysisFilter() {
     }
 }
 
-// --- Emoji Picker Functions (No Changes) ---
+// --- Emoji Picker Functions (Old) ---
 const EMOJI_CATEGORIES = [
     { name: 'Smileys', icon: '😀', emojis: ['😀', '😁', '😂', '🤣', '😃', '😄', '😅', '😆', '😉', '😊', '😋', '😎', '😍', '😘', '🥰', '😗', '😙', '🥲', '🤔', '🤫', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '😮‍💨', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '🥸', '🤓', '🧐', '😕', '😟', '🙁', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈', '👿', '💀', '💩', '🤡', '👹', '👺', '👻', '👽', '🤖', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾']},
     { name: 'People', icon: '👋', emojis: ['👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🫰', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦵', '🦶', '👂', '🦻', '👃', '🧠', '🫀', '🦷', '🦴', '👀', '👁️', '👅', '👄', '👶', '🧒', '👦', '👧', '🧑', '👱', '👨', '👩', '🧓', '👴', '👵', '🙍', '🙎', '🙅', '🙆', '💁', '🙋', '🧏', '🙇', '🤦', '🤷', '🧑‍⚕️', '🧑‍🎓', '🧑‍🏫', '🧑‍⚖️', '🧑‍🌾', '🧑‍🍳', '🧑‍🔧', '🧑‍🏭', '🧑‍💼', '🧑‍🔬', '🧑‍💻', '🧑‍🎤', '🧑‍🎨', '🧑‍✈️', '🧑‍🚀', '🧑‍🚒', '👮', '🕵️', '💂', '🥷', '👷', '🤴', '👸', '👳', '👲', '🧕', '🤵', '👰', '🤰', '🤱', '👼', '🎅', '🦸', '🦹', '🧙', '🧚', '🧛', '🧜', '🧝', '🧞', '🧟', '💆', '💇', '🚶', '🧍', '🧎', '🧑‍🦽', '🧑‍🦼', '🏃', '💃', '🕺', '🕴️', '👯', '🧘', '🛀', '🛌', '🫂', '🗣️', '👤', '👥', '👣']},
@@ -687,6 +697,89 @@ function handleEmojiSelect(e) {
     }
 }
 
+// --- NEW V24: Icon Picker Functions ---
+const ALL_BOOTSTRAP_ICONS = [ // A subset for performance
+    'bi-alarm-fill', 'bi-archive-fill', 'bi-aspect-ratio-fill', 'bi-award-fill', 'bi-bank', 'bi-bar-chart-fill',
+    'bi-basket-fill', 'bi-bell-fill', 'bi-book-fill', 'bi-bookmark-fill', 'bi-briefcase-fill', 'bi-broadcast',
+    'bi-bug-fill', 'bi-building', 'bi-bullseye', 'bi-calculator-fill', 'bi-calendar-check-fill', 'bi-calendar-event-fill',
+    'bi-camera-fill', 'bi-camera-video-fill', 'bi-capsule', 'bi-card-checklist', 'bi-cart-fill', 'bi-cash-coin',
+    'bi-chat-dots-fill', 'bi-check-circle-fill', 'bi-clipboard-data-fill', 'bi-clock-fill', 'bi-cloud-fill',
+    'bi-code-slash', 'bi-coin', 'bi-collection-play-fill', 'bi-compass-fill', 'bi-controller', 'bi-credit-card-fill',
+    'bi-cup-fill', 'bi-diagram-3-fill', 'bi-display-fill', 'bi-dribbble', 'bi-droplet-fill', 'bi-earbuds',
+    'bi-egg-fill', 'bi-eject-fill', 'bi-emoji-smile-fill', 'bi-envelope-fill', 'bi-file-earmark-code-fill', 'bi-file-earmark-music-fill',
+    'bi-file-earmark-text-fill', 'bi-film', 'bi-filter', 'bi-flag-fill', 'bi-folder-fill', 'bi-fuel-pump-fill',
+    'bi-funnel-fill', 'bi-gear-fill', 'bi-gem', 'bi-geo-alt-fill', 'bi-gift-fill', 'bi-github', 'bi-globe',
+    'bi-google', 'bi-graph-up', 'bi-grid-fill', 'bi-hammer', 'bi-handbag-fill', 'bi-headphones', 'bi-heart-fill',
+    'bi-house-door-fill', 'bi-image-fill', 'bi-inbox-fill', 'bi-joystick', 'bi-key-fill', 'bi-keyboard-fill',
+    'bi-laptop-fill', 'bi-layout-text-window-reverse', 'bi-lightbulb-fill', 'bi-lightning-fill', 'bi-list-task',
+    'bi-lock-fill', 'bi-magic', 'bi-mailbox', 'bi-map-fill', 'bi-megaphone-fill', 'bi-mic-fill', 'bi-moon-fill',
+    'bi-mouse-fill', 'bi-music-note-beamed', 'bi-newspaper', 'bi-palette-fill', 'bi-paperclip', 'bi-pause-fill',
+    'bi-pc-display', 'bi-pencil-fill', 'bi-people-fill', 'bi-phone-fill', 'bi-pie-chart-fill', 'bi-piggy-bank-fill',
+    'bi-pin-map-fill', 'bi-play-fill', 'bi-plug-fill', 'bi-printer-fill', 'bi-puzzle-fill', 'bi-question-circle-fill',
+    'bi-receipt', 'bi-rocket-takeoff-fill', 'bi-save-fill', 'bi-sd-card-fill', 'bi-search', 'bi-shield-shaded',
+    'bi-shop', 'bi-skip-forward-fill', 'bi-slack', 'bi-smartwatch', 'bi-snow', 'bi-speaker-fill', 'bi-spotify',
+    'bi-star-fill', 'bi-stopwatch-fill', 'bi-sun-fill', 'bi-tablet-fill', 'bi-tag-fill', 'bi-terminal-fill',
+    'bi-tools', 'bi-trash-fill', 'bi-translate', 'bi-trophy-fill', 'bi-truck', 'bi-tv-fill', 'bi-twitch',
+    'bi-twitter', 'bi-umbrella-fill', 'bi-unlock-fill', 'bi-vinyl-fill', 'bi-wallet-fill', 'bi-water',
+    'bi-whatsapp', 'bi-wifi', 'bi-wind', 'bi-window-fullscreen', 'bi-wordpress', 'bi-wrench-adjustable',
+    'bi-youtube', 'bi-zoom-in'
+];
+
+function populateIconPicker() {
+    const query = iconSearchInput.value.toLowerCase();
+    iconPickerGrid.innerHTML = '';
+    let html = '';
+    for (const iconName of ALL_BOOTSTRAP_ICONS) {
+        if (query === '' || iconName.includes(query)) {
+            html += `<button class="icon-picker-btn" data-icon="${iconName}" title="${iconName}"><i class="bi ${iconName} pointer-events-none"></i></button>`;
+        }
+    }
+    iconPickerGrid.innerHTML = html;
+}
+
+function showIconPicker(buttonTarget, valueTarget, previewTarget) {
+    currentIconInputTarget = { button: buttonTarget, value: valueTarget, preview: previewTarget };
+    iconSearchInput.value = '';
+    populateIconPicker();
+    iconPickerModal.classList.add('active');
+}
+
+function hideIconPicker() {
+    iconPickerModal.classList.remove('active');
+    currentIconInputTarget = null;
+}
+
+function handleIconSelect(e) {
+    const btn = e.target.closest('.icon-picker-btn');
+    if (btn && currentIconInputTarget) {
+        const iconName = btn.dataset.icon;
+        
+        // This is for Add/Edit Category modal
+        if (currentIconInputTarget.preview) {
+             currentIconInputTarget.preview.className = `bi ${iconName}`;
+        }
+        
+        // This is for Add/Edit Activity (Goal) modal
+        if (currentIconInputTarget.button) {
+            currentIconInputTarget.button.innerHTML = `<i class="bi ${iconName}"></i>`;
+        }
+        
+        currentIconInputTarget.value.value = iconName;
+        hideIconPicker();
+    }
+}
+// --- END V24 Icon Picker ---
+
+// --- NEW V24 Settings Modal ---
+function showSettingsModal() {
+    settingsModal.classList.add('active');
+}
+function hideSettingsModal() {
+    settingsModal.classList.remove('active');
+}
+// --- END V24 Settings Modal ---
+
+
 // --- Theme (No Changes) ---
 function toggleTheme() {
     const isDark = document.body.classList.toggle('dark-theme');
@@ -706,6 +799,9 @@ function updateTheme(isDark) {
     updateChartDefaults(isDark);
     if (pages.analysis.classList.contains('active')) {
        loadAnalysisData(); 
+    }
+    if (pages.categories.classList.contains('active')) { // NEW
+       renderCategoriesPage();
     }
 }
 function updateThemeIcon(isDark) {
@@ -757,11 +853,3 @@ function formatShortDuration(ms) {
      let parts = []; if (h > 0) parts.push(`${h}h`); if (m > 0) parts.push(`${m}m`);
      if (h === 0 && m === 0) { if (secs > 0) parts.push(`${secs}s`); else return "0m"; } return parts.join(' ');
 }
-
-// --- Drag & Drop (DELETED) ---
-// setupDragAndDrop()
-// getDragAfterElement()
-// reorderLocalArrayAndCategory()
-// saveOrder()
-// --- All DELETED ---
-
