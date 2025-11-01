@@ -7,729 +7,212 @@ function formatDate(date) {
     return `${day}/${month}/${year}`;
 }
 
-// --- NEW Home Page Rendering ---
-function renderHomePage() {
+// --- NEW V24: Category Page State ---
+let categoriesDonutChart = null;
+// MODIFICATION: Replaced old time range with new object
+let currentCategoriesTimeRange = { 
+    type: 'month', 
+    start: getStartOfDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
+    end: getEndOfDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)) 
+};
+
+// --- NEW V24: Render Categories Page ---
+function renderCategoriesPage() {
     if (!userId) {
-        homeCardsContainer.innerHTML = `<p class="text-center text-muted text-sm w-full">Please sign in.</p>`;
-        homeTimerCard.classList.remove('active');
-        aiSummaryContent.style.display = 'none';
-        return;
-    }
-
-    const today = getStartOfDate(new Date());
-    const todayString = getTodayString();
-    
-    // 1. Render Active Timer Card
-    if (currentTimer) {
-        homeTimerLabel.textContent = currentTimer.timerType === 'task' ? 'Tracking Task:' : 'Tracking Activity:';
-        homeTimerActivityName.textContent = currentTimer.activityName;
-        const elapsedMs = Date.now() - currentTimer.startTime;
-        homeTimerTime.textContent = formatHHMMSS(elapsedMs);
-        homeTimerCard.classList.add('active');
-    } else {
-        homeTimerCard.classList.remove('active');
-    }
-    
-    // --- 2. Render Today's Items Card ---
-    homeTodayList.innerHTML = '';
-    const todayPlannerItems = Array.from(plannerItems.values())
-        .filter(item => item.dueDate === todayString && !item.isCompleted)
-        .sort((a, b) => a.name.localeCompare(b.name));
-    
-    if (todayPlannerItems.length > 0) {
-        homeTodayCard.style.display = 'block';
-        todayPlannerItems.forEach(item => {
-            homeTodayList.insertAdjacentHTML('beforeend', renderHomeItem(item, item.type));
-        });
-    } else {
-        homeTodayCard.style.display = 'none';
-    }
-
-    // --- 3. Render Daily Goals Card ---
-    homeGoalsList.innerHTML = '';
-    const dailyGoals = Array.from(activities.values())
-        .filter(act => act.goal && act.goal.period === 'daily' && act.goal.value > 0)
-        .sort((a, b) => a.name.localeCompare(b.name));
-        
-    if (dailyGoals.length > 0) {
-        homeGoalsCard.style.display = 'block';
-        dailyGoals.forEach(activity => {
-            const totalTodayMs = allTimeLogs
-                .filter(log => log.activityId === activity.id && log.timerType === 'activity' && new Date(log.startTime) >= getStartOfDate(new Date()))
-                .reduce((acc, log) => acc + log.durationMs, 0);
-            
-            homeGoalsList.insertAdjacentHTML('beforeend', renderHomeItem(activity, 'goal', totalTodayMs));
-        });
-    } else {
-        homeGoalsCard.style.display = 'none';
-    }
-    
-    // --- 4. Render Upcoming Card ---
-    homeUpcomingList.innerHTML = '';
-    const nextSevenDays = new Date(today);
-    nextSevenDays.setDate(today.getDate() + 7);
-    
-    const upcomingItems = Array.from(plannerItems.values())
-        .filter(item => {
-            const dueDate = new Date(item.dueDate + 'T00:00:00');
-            return dueDate > today && dueDate <= nextSevenDays && !item.isCompleted;
-        })
-        .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
-        
-    if (upcomingItems.length > 0) {
-        homeUpcomingCard.style.display = 'block';
-        upcomingItems.forEach(item => {
-            homeUpcomingList.insertAdjacentHTML('beforeend', renderHomeItem(item, item.type));
-        });
-    } else {
-        homeUpcomingCard.style.display = 'none';
-    }
-
-    // --- 5. Render Notifications Card ---
-    homeNotificationsList.innerHTML = '';
-    const notificationItems = Array.from(plannerItems.values())
-        .filter(item => {
-            if (item.isCompleted || !item.notifyDays || item.notifyDays === 'none') {
-                return false;
-            }
-            const notifyDays = parseInt(item.notifyDays);
-            const notifyDate = new Date(item.dueDate + 'T00:00:00');
-            notifyDate.setDate(notifyDate.getDate() - notifyDays);
-            
-            return today >= notifyDate && today <= new Date(item.dueDate + 'T00:00:00');
-        })
-        .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
-
-    if (notificationItems.length > 0) {
-        homeNotificationsCard.style.display = 'block';
-        notificationItems.forEach(item => {
-            homeNotificationsList.insertAdjacentHTML('beforeend', renderHomeItem(item, item.type));
-        });
-    } else {
-        homeNotificationsCard.style.display = 'none';
-    }
-
-    // --- 6. AI Summary Card (already exists) ---
-}
-
-// NEW: Renderer for a single item on the Home page
-function renderHomeItem(item, type, totalTodayMs = 0) {
-    const isRunning = currentTimer && currentTimer.activityId === item.id && 
-                      ((type === 'task' && currentTimer.timerType === 'task') || (type === 'goal' && currentTimer.timerType === 'activity'));
-    const timerActive = currentTimer !== null;
-
-    let iconHtml, name, detailsHtml, actionHtml;
-    const today = getStartOfDate(new Date());
-
-    if (type === 'goal') {
-        const category = categories.get(item.categoryId) || {};
-        iconHtml = `
-            <div class="icon-badge-container">
-                <div class="icon-badge-main" style="background-color: ${item.color || '#808080'}; color: white;">
-                    <i class="bi ${item.iconName || 'bi-bullseye'}"></i>
-                </div>
-                ${category.iconName ? `
-                <div class="icon-badge-secondary" style="background-color: ${category.color || '#808080'};">
-                    <i class="bi ${category.iconName}"></i>
-                </div>` : ''}
-            </div>
-        `;
-        name = item.name;
-        
-        let goalMs = (item.goal.value || 0) * 3600000;
-        const percentage = goalMs > 0 ? Math.min(100, (totalTodayMs / goalMs) * 100) : 0;
-        
-        detailsHtml = `
-            <p>${formatShortDuration(totalTodayMs)} of ${item.goal.value}h (${percentage.toFixed(0)}%)</p>
-            <div class="goal-bar-bg mt-1">
-                <div class="goal-bar-fill" style="width: ${percentage}%; background-color: ${item.color || '#808080'}"></div>
-            </div>
-        `;
-        actionHtml = `
-            <button class="home-item-action-btn btn-start-activity" data-id="${item.id}" data-type="activity" ${timerActive ? 'disabled' : ''}>
-                <svg class="w-6 h-6 pointer-events-none" fill="currentColor" viewBox="0 0 20 20">${isRunning ? 
-                    `<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd"></path>` : 
-                    `<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>`
-                }</svg>
-            </button>
-        `;
-    } else if (type === 'task') {
-        iconHtml = `<div class="icon-badge-main"><i class="bi bi-check2-circle"></i></div>`;
-        name = item.name;
-        const tracked = item.trackedDurationMs || 0;
-        let subtext = `${formatShortDuration(tracked)} tracked`;
-        if (item.targetHours > 0) {
-            const targetMs = item.targetHours * 3600000;
-            const percentage = Math.min(100, (tracked / targetMs) * 100).toFixed(0);
-            subtext = `${formatShortDuration(tracked)} / ${item.targetHours}h (${percentage}%)`;
-        }
-        detailsHtml = `<p>${subtext}</p>`;
-        actionHtml = `
-            <button class="home-item-action-btn btn-start-task" data-id="${item.id}" data-type="task" ${timerActive ? 'disabled' : ''}>
-                <svg class="w-6 h-6 pointer-events-none" fill="currentColor" viewBox="0 0 20 20">${isRunning ? 
-                    `<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd"></path>` : 
-                    `<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>`
-                }</svg>
-            </button>
-        `;
-    } else { // 'deadline'
-        iconHtml = `<div class="icon-badge-main"><i class="bi bi-calendar-event"></i></div>`;
-        name = item.name;
-        const dueDate = new Date(item.dueDate + 'T00:00:00');
-        let subtext = dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        if (dueDate < today) subtext = `Overdue: ${subtext}`;
-        detailsHtml = `<p>${subtext}</p>`;
-        actionHtml = `
-            <input type="checkbox" class="home-item-checkbox" data-id="${item.id}" ${item.isCompleted ? 'checked' : ''}>
-        `;
-    }
-
-    return `
-    <div class="home-item" data-id="${item.id}" data-type="${type}">
-        ${iconHtml}
-        <div class="home-item-details">
-            <h4>${name}</h4>
-            ${detailsHtml}
-        </div>
-        ${actionHtml}
-    </div>
-    `;
-}
-
-// NEW: Handle Home Page Clicks
-function handleHomeItemClick(e) {
-    const startTaskBtn = e.target.closest('.btn-start-task');
-    const startActivityBtn = e.target.closest('.btn-start-activity');
-    const checkbox = e.target.closest('.home-item-checkbox');
-    const mainItem = e.target.closest('.home-item');
-
-    if (startTaskBtn && !startTaskBtn.disabled) {
-        const id = startTaskBtn.dataset.id;
-        const item = plannerItems.get(id);
-        if (item) {
-            startTimer(item.id, item.name, '#808080', 'task');
-        }
-    } else if (startActivityBtn && !startActivityBtn.disabled) {
-        const id = startActivityBtn.dataset.id;
-        const activity = activities.get(id);
-        if (activity) {
-            startTimer(activity.id, activity.name, activity.color, 'activity');
-        }
-    } else if (checkbox) {
-        const id = checkbox.dataset.id;
-        handlePlannerItemCheck(id, checkbox.checked);
-    } else if (mainItem) {
-        // Open edit modal when clicking the item
-        const id = mainItem.dataset.id;
-        showAddItemModal(id);
-    }
-}
-
-// --- NEW AI Summary Functions (Unchanged from old file) ---
-async function handleGenerateAISummary() {
-    if (!userId) return;
-    generateAiSummaryBtn.disabled = true;
-    generateAiSummaryBtn.textContent = "Generating...";
-    aiSummaryContent.style.display = 'none';
-    try {
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        sevenDaysAgo.setHours(0, 0, 0, 0);
-        const snapshot = await timeLogsCollection()
-            .where('startTime', '>=', sevenDaysAgo.getTime())
-            .orderBy('startTime', 'asc')
-            .get();
-        if (snapshot.empty) {
-            aiSummaryContent.innerHTML = `<p>Not enough data from the last 7 days to generate a summary.</p>`;
-            aiSummaryContent.style.display = 'block';
-            return;
-        }
-        let logSummary = "Activity Log (Last 7 Days):\n";
-        let dayLogs = new Map();
-        snapshot.forEach(doc => {
-            const log = doc.data();
-            if (log.timerType === 'task') return; 
-            const date = new Date(log.startTime).toLocaleDateString('en-CA');
-            const activityName = activities.get(log.activityId)?.name || log.activityName;
-            if (!dayLogs.has(date)) dayLogs.set(date, new Map());
-            let dateMap = dayLogs.get(date);
-            let currentDuration = dateMap.get(activityName) || 0;
-            dateMap.set(activityName, currentDuration + log.durationMs);
-        });
-        if (dayLogs.size === 0) {
-             aiSummaryContent.innerHTML = `<p>No activity data from the last 7 days to generate a summary (only task data found).</p>`;
-            aiSummaryContent.style.display = 'block';
-            return;
-        }
-        dayLogs.forEach((dateMap, date) => {
-            logSummary += `Date: ${date}\n`;
-            dateMap.forEach((durationMs, activityName) => {
-                logSummary += `- ${activityName}: ${formatShortDuration(durationMs)}\n`;
-            });
-        });
-        const systemPrompt = "You are a friendly and encouraging productivity coach. Analyze the user's time tracking log for the past week. Provide a concise, 2-3 sentence summary. Be encouraging, point out one positive trend, and gently suggest one area for potential improvement. Do not use markdown or bullet points, just a simple paragraph.";
-        const userQuery = logSummary;
-        const responseText = await callGeminiAPI(systemPrompt, userQuery);
-        aiSummaryContent.innerHTML = `<p>${responseText.replace(/\n/g, '<br>')}</p>`;
-        aiSummaryContent.style.display = 'block';
-    } catch (error) {
-        console.error("Error generating AI summary:", error);
-        aiSummaryContent.innerHTML = `<p>Sorry, an error occurred while generating the summary.</p>`;
-        aiSummaryContent.style.display = 'block';
-    } finally {
-        generateAiSummaryBtn.disabled = false;
-        generateAiSummaryBtn.textContent = "Generate Summary";
-    }
-}
-async function callGeminiAPI(systemPrompt, userQuery) {
-    const apiKey = ""; // API key will be injected
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-    const payload = {
-        contents: [{ parts: [{ text: userQuery }] }],
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-    };
-    const response = await fetchWithBackoff(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    });
-    if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorBody}`);
-    }
-    const result = await response.json();
-    const candidate = result.candidates?.[0];
-    if (candidate && candidate.content?.parts?.[0]?.text) {
-        return candidate.content.parts[0].text;
-    } else {
-        console.warn("Gemini API response structure unexpected:", result);
-        throw new Error("Invalid response from AI service.");
-    }
-}
-async function fetchWithBackoff(url, options, retries = 3, delay = 1000) {
-    try {
-        const response = await fetch(url, options);
-        if (response.status === 429 && retries > 0) { 
-            await new Promise(resolve => setTimeout(resolve, delay));
-            return fetchWithBackoff(url, options, retries - 1, delay * 2);
-        }
-        return response;
-    } catch (error) {
-        if (retries > 0) {
-            await new Promise(resolve => setTimeout(resolve, delay));
-            return fetchWithBackoff(url, options, retries - 1, delay * 2);
-        }
-        throw error;
-    }
-}
-
-// --- Track Page (NEW) ---
-function handleViewToggle() {
-    if (currentTrackView === 'list') {
-        currentTrackView = 'grid';
-        trackViewIconList.classList.add('hidden');
-        trackViewIconGrid.classList.remove('hidden');
-    } else {
-        currentTrackView = 'list';
-        trackViewIconList.classList.remove('hidden');
-        trackViewIconGrid.add('hidden');
-    }
-    renderTrackPage();
-}
-
-function renderTrackPage() {
-    if (!userId) {
-        trackContentArea.innerHTML = `<p class="text-center text-muted p-4">Please sign in.</p>`;
+        categoriesListContainer.innerHTML = `<p class="text-center text-muted">Please sign in.</p>`;
         return;
     }
     
-    trackContentArea.innerHTML = `<div class="text-center p-8"><p class="text-muted">Loading...</p></div>`; // Loading state
-
-    if (currentTrackView === 'list') {
-        trackContentArea.classList.remove('grid-view');
-        renderTrackList();
-    } else {
-        trackContentArea.classList.add('grid-view');
-        renderTrackGrid();
-    }
-}
-
-async function renderTrackList() {
-    if (!userId) return;
-
-    // 1. Get all items (Goals from Activities, Tasks/Deadlines from Planner)
-    let allItems = [];
+    // 1. Set Date Navigator Text
+    updateCategoriesNavText();
     
-    activities.forEach(activity => {
-        allItems.push({
-            ...activity,
-            type: 'goal', // All activities are treated as "Goals"
-            date: null 
-        });
-    });
-
-    plannerItems.forEach(item => {
-        allItems.push({
-            ...item,
-            type: item.type, // 'task' or 'deadline'
-            date: new Date(item.dueDate + 'T00:00:00')
-        });
-    });
-
-    // 2. Filter items based on state
-    const today = getStartOfDate(new Date());
-    const searchQuery = trackSearchQuery.toLowerCase();
+    // 2. Get logs for the current period
+    const { start, end } = getCategoriesDateRange();
+    const logsInRange = allTimeLogs.filter(log => 
+        log.startTime >= start.getTime() && log.startTime <= end.getTime() && log.timerType !== 'task'
+    );
     
-    const filteredItems = allItems.filter(item => {
-        // Filter by Search Query
-        if (searchQuery) {
-            const name = item.name?.toLowerCase() || '';
-            const notes = item.notes?.toLowerCase() || '';
-            const category = categories.get(item.categoryId)?.name?.toLowerCase() || '';
-            if (!name.includes(searchQuery) && !category.includes(searchQuery) && !notes.includes(searchQuery)) {
-                return false;
-            }
-        }
-        
-        // Filter by Type (TODO: Re-implement filter modal)
-        
-        // Filter by Time Range
-        if (item.type === 'task' || item.type === 'deadline') {
-            if (item.date < currentTrackTimeRange.start || item.date > currentTrackTimeRange.end) {
-                const isOverdue = item.date < today && !item.isCompleted;
-                const rangeIncludesToday = currentTrackTimeRange.start <= today && currentTrackTimeRange.end >= today;
-                
-                if (isOverdue && rangeIncludesToday) {
-                    // It's overdue, show it in today's range
-                } else {
-                    return false;
-                }
-            }
-        } else if (item.type === 'goal') {
-            // Goals are always shown unless filtered by category/name
-        }
-        
-        return true;
-    });
-    
-    // 3. Group filtered items
-    const groups = new Map();
-    const todayString = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    
-    // Group Overdue, Today, and Upcoming Tasks/Deadlines
-    filteredItems.filter(item => item.type === 'task' || item.type === 'deadline').forEach(item => {
-        let groupName;
-        if (item.date < today && !item.isCompleted) {
-            groupName = 'Overdue';
-        } else {
-            groupName = item.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            if (groupName === todayString) groupName = 'Today';
-        }
-        
-        if (!groups.has(groupName)) groups.set(groupName, []);
-        groups.get(groupName).push(item);
-    });
-    
-    // Group Activities by Category
-    filteredItems.filter(item => item.type === 'goal').forEach(activity => {
-        const category = categories.get(activity.categoryId) || { name: 'Uncategorized' };
-        const groupName = `Category: ${category.name}`;
-        if (!groups.has(groupName)) groups.set(groupName, []);
-        groups.get(groupName).push(activity);
-    });
+    // 3. Calculate totals by Category
+    const totalsByCategory = new Map();
+    let totalTimeMs = 0;
 
-    // 4. Render groups
-    trackContentArea.innerHTML = '';
-    
-    if (filteredItems.length === 0) {
-        trackContentArea.innerHTML = `<p class="text-center text-muted p-4">No items match your criteria.</p>`;
-        return;
-    }
-
-    // Sort groups
-    const sortedGroupNames = Array.from(groups.keys()).sort((a, b) => {
-        if (a === 'Overdue') return -1;
-        if (b === 'Overdue') return 1;
-        if (a === 'Today') return -1;
-        if (b === 'Today') return 1;
-        if (a.startsWith('Category:')) return 1; // Put categories at the bottom
-        if (b.startsWith('Category:')) return -1;
-        return new Date(a) - new Date(b); // Sort by date
-    });
-
-    sortedGroupNames.forEach(groupName => {
-        const items = groups.get(groupName).sort((a, b) => a.name.localeCompare(b.name));
-        
-        let totalGoalMs = 0;
-        let totalTrackedMs = 0;
-        
-        items.forEach(item => {
-            if (item.type === 'task' || item.type === 'goal') {
-                totalGoalMs += (item.targetHours || item.goal?.value || 0) * 3600000;
-                
-                if (item.type === 'task') {
-                    totalTrackedMs += item.trackedDurationMs || 0;
-                } else { 
-                    totalTrackedMs += allTimeLogs
-                        .filter(log => log.activityId === item.id && 
-                                       log.timerType === 'activity' && 
-                                       log.startTime >= currentTrackTimeRange.start.getTime() &&
-                                       log.startTime <= currentTrackTimeRange.end.getTime())
-                        .reduce((acc, log) => acc + log.durationMs, 0);
-                }
-            }
-        });
-
-        const headerHtml = `
-            <div class="track-list-header">
-                <h2>${groupName.replace('Category: ', '')}</h2>
-                <p>
-                    ${totalTrackedMs > 0 ? `${formatShortDuration(totalTrackedMs)}` : ''}
-                    ${totalGoalMs > 0 ? `<span> / ${formatShortDuration(totalGoalMs)}</span>` : ''}
-                </p>
-            </div>
-        `;
-        trackContentArea.insertAdjacentHTML('beforeend', headerHtml);
-        
-        items.forEach(item => {
-            trackContentArea.insertAdjacentHTML('beforeend', renderTrackItem(item));
-        });
-    });
-}
-
-// NEW: Renderer for a single item on the Track page list
-function renderTrackItem(item) {
-    const isRunning = currentTimer && currentTimer.activityId === item.id && 
-                      ((item.type === 'task' && currentTimer.timerType === 'task') || (item.type === 'goal' && currentTimer.timerType === 'activity'));
-    const timerActive = currentTimer !== null;
-    const isOverdue = (item.type === 'task' || item.type === 'deadline') && new Date(item.dueDate + 'T00:00:00') < getStartOfDate(new Date()) && !item.isCompleted;
-
-    let iconHtml, name, subtext, progressBar, actionHtml;
-
-    if (item.type === 'goal' || item.type === 'task') {
-        let itemIcon = 'bi-bullseye'; // Default for goal
-        let itemColor = '#808080';
-        let categoryIcon = '';
-        let categoryColor = '#808080';
-        
-        if (item.type === 'goal') {
-            const category = categories.get(item.categoryId);
-            itemIcon = item.iconName || 'bi-bullseye';
-            itemColor = item.color || '#808080';
-            if (category) {
-                categoryIcon = category.iconName;
-                categoryColor = category.color;
-            }
-            name = item.name;
-            subtext = category?.name || 'Uncategorized';
-        } else { // 'task'
-            itemIcon = 'bi-check2-circle';
-            name = item.name;
-            subtext = 'Task';
-        }
-        
-        iconHtml = `
-            <div class="icon-badge-container">
-                <div class="icon-badge-main" style="background-color: ${itemColor}; color: white;">
-                    <i class="bi ${itemIcon}"></i>
-                </div>
-                ${categoryIcon ? `
-                <div class="icon-badge-secondary" style="background-color: ${categoryColor};">
-                    <i class="bi ${categoryIcon}"></i>
-                </div>` : ''}
-            </div>
-        `;
-
-        let trackedMs = 0;
-        let targetMs = 0;
-
-        if (item.type === 'goal') {
-            targetMs = (item.goal?.value || 0) * 3600000;
-            trackedMs = allTimeLogs
-                .filter(log => log.activityId === item.id && 
-                               log.timerType === 'activity' &&
-                               log.startTime >= currentTrackTimeRange.start.getTime() &&
-                               log.startTime <= currentTrackTimeRange.end.getTime())
-                .reduce((acc, log) => acc + log.durationMs, 0);
-        } else { // 'task'
-            targetMs = (item.targetHours || 0) * 3600000;
-            trackedMs = item.trackedDurationMs || 0;
-        }
-        
-        const percentage = targetMs > 0 ? Math.min(100, (trackedMs / targetMs) * 100) : 0;
-        
-        progressBar = `
-            <div class="track-item-progress-bar">
-                <div class="track-item-progress-fill" style="width: ${percentage}%; background-color: ${itemColor}"></div>
-            </div>
-            <p>${formatShortDuration(trackedMs)} ${targetMs > 0 ? `/ ${formatShortDuration(targetMs)} (${percentage.toFixed(0)}%)` : ''}</p>
-        `;
-        
-        actionHtml = `
-            <button class="track-item-action-btn ${isRunning ? 'stop' : 'start'}" data-id="${item.id}" data-type="${item.type === 'goal' ? 'activity' : 'task'}" ${!isRunning && timerActive ? 'disabled' : ''}>
-                ${isRunning ? 
-                    `<svg class="w-6 h-6 pointer-events-none" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd"></path></svg>
-                     <span class="track-item-timer">${formatHHMMSS(Date.now() - currentTimer.startTime).substring(3)}</span>` : 
-                    `<svg class="w-6 h-6 pointer-events-none" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>`
-                }
-            </button>
-        `;
-
-    } else { // 'deadline'
-        iconHtml = `<div class="icon-badge-main"><i class="bi bi-calendar-event"></i></div>`;
-        name = item.name;
-        subtext = item.notes || 'Deadline';
-        progressBar = '';
-        actionHtml = `
-            <input type="checkbox" class="track-item-checkbox" data-id="${item.id}" ${item.isCompleted ? 'checked' : ''}>
-        `;
-    }
-
-    return `
-    <div class="track-item ${isOverdue ? 'overdue' : ''}" data-id="${item.id}" data-type="${item.type}">
-        <div class="track-item-main" data-id="${item.id}" data-type="${item.type}">
-            ${iconHtml}
-            <div class="track-item-details">
-                <h4>${name}</h4>
-                <p>${subtext}</p>
-                ${progressBar}
-            </div>
-        </div>
-        <div class="track-item-actions">
-            ${actionHtml}
-        </div>
-    </div>
-    `;
-}
-
-// NEW: Render Track Page Grid View
-function renderTrackGrid() {
-    let gridHtml = '<div id="heatmap-weekdays"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div><div class="track-grid-heatmap">';
-    
-    const { start, end } = currentTrackTimeRange;
-    
-    const logsInRange = allTimeLogs.filter(log => {
-        return log.startTime >= start.getTime() && log.startTime <= end.getTime();
-    });
-
-    const hoursByDay = new Map(); // Key: 'YYYY-MM-DD'
     logsInRange.forEach(log => {
-        const dayStr = new Date(log.startTime).toLocaleDateString('en-CA');
-        const hours = log.durationMs / 3600000;
-        hoursByDay.set(dayStr, (hoursByDay.get(dayStr) || 0) + hours);
+        const activity = activities.get(log.activityId);
+        // MODIFICATION: Use categoryId from activity
+        const categoryId = activity?.categoryId || 'uncategorized';
+        
+        let currentTotal = totalsByCategory.get(categoryId) || 0;
+        currentTotal += log.durationMs;
+        totalsByCategory.set(categoryId, currentTotal);
+        
+        totalTimeMs += log.durationMs;
     });
+
+    // 4. Get category objects and sort by time
+    const sortedCategoryData = Array.from(totalsByCategory.entries())
+        .map(([id, timeMs]) => {
+            // MODIFICATION: Fetch new category object
+            const category = categories.get(id) || { id: 'uncategorized', name: 'Uncategorized', color: '#808080', iconName: 'bi-question-circle' };
+            return { ...category, timeMs };
+        })
+        .sort((a, b) => b.timeMs - a.timeMs);
+
+    // 5. Render Donut Chart
+    renderCategoriesDonutChart(sortedCategoryData, totalTimeMs);
     
-    const maxHours = Math.max(0, ...hoursByDay.values());
-    
-    let loopDate = new Date(start);
-    
-    let firstDayIndex = loopDate.getDay();
-    firstDayIndex = (firstDayIndex === 0) ? 6 : (firstDayIndex - 1); // Mon=0, Sun=6
-    for (let i = 0; i < firstDayIndex; i++) {
-        gridHtml += '<div class="heatmap-day-padding"></div>';
+    // 6. Render List
+    categoriesListContainer.innerHTML = '';
+    if (sortedCategoryData.length === 0) {
+        categoriesListContainer.innerHTML = `<p class="text-center text-muted">No time tracked for this period.</p>`;
+        return;
     }
-    
-    while (loopDate <= end) {
-        const dayStr = loopDate.toLocaleDateString('en-CA');
-        const hours = hoursByDay.get(dayStr) || 0;
-        const level = getHeatmapLevel(hours, maxHours);
-        
-        const title = `${dayStr}: ${hours.toFixed(1)} hours`;
-        gridHtml += `<div class="track-grid-day" data-level="${level}" title="${title}" data-date="${dayStr}"></div>`;
-        
-        loopDate.setDate(loopDate.getDate() + 1);
-    }
-    
-    gridHtml += '</div>'; // Close .track-grid-heatmap
-    trackContentArea.innerHTML = gridHtml;
+
+    sortedCategoryData.forEach(cat => {
+        const percentage = totalTimeMs > 0 ? (cat.timeMs / totalTimeMs) * 100 : 0;
+        categoriesListContainer.innerHTML += `
+            <div class="category-list-item" data-id="${cat.id}">
+                <div class="category-icon-bg" style="background-color: ${cat.color}">
+                    <i class="bi ${cat.iconName}"></i>
+                </div>
+                <h4 class="category-list-name">${cat.name}</h4>
+                <span class="category-list-time">${formatShortDuration(cat.timeMs)}</span>
+                <div class="category-list-bar-bg">
+                    <div class="category-list-bar-fill" style="width: ${percentage}%; background-color: ${cat.color};"></div>
+                </div>
+                <span class="category-list-percent">${percentage.toFixed(0)}%</span>
+            </div>
+        `;
+    });
 }
 
-// Heatmap level calculator
-function getHeatmapLevel(hours, maxHours) {
-    if (hours <= 0) return 0;
-    if (maxHours <= 0) return 1; // Avoid division by zero
-    const ratio = hours / maxHours;
-    if (ratio < 0.25) return 1;
-    if (ratio < 0.5) return 2;
-    if (ratio < 0.75) return 3;
-    return 4;
-}
+function renderCategoriesDonutChart(data, totalTimeMs) {
+    if (categoriesDonutChart) {
+        categoriesDonutChart.destroy();
+    }
+    
+    // Clear placeholder
+    categoriesChartContainer.innerHTML = ''; 
+    
+    if (data.length === 0) {
+        categoriesChartContainer.innerHTML = `<p class="text-center text-muted">No data for chart</p>`;
+        return;
+    }
 
-// --- NEW Track Page Event Handlers ---
+    // Add canvas and center text
+    categoriesChartContainer.innerHTML = `
+        <canvas id="categories-donut-chart"></canvas>
+        <div id="categories-chart-center-text">
+            <div id="categories-chart-total-time">${formatShortDuration(totalTimeMs)}</div>
+            <div id="categories-chart-label">Total Time</div>
+        </div>
+    `;
 
-function handleTrackListClick(e) {
-    const startBtn = e.target.closest('.track-item-action-btn.start');
-    const stopBtn = e.target.closest('.track-item-action-btn.stop');
-    const checkbox = e.target.closest('.track-item-checkbox');
-    const mainItem = e.target.closest('.track-item-main');
-
-    if (startBtn && !startBtn.disabled) {
-        const id = startBtn.dataset.id;
-        const type = startBtn.dataset.type; // 'activity' or 'task'
-        
-        if (type === 'activity') {
-            const activity = activities.get(id);
-            if (activity) {
-                startTimer(activity.id, activity.name, activity.color, 'activity');
-            }
-        } else { // 'task'
-            const item = plannerItems.get(id);
-            if (item) {
-                startTimer(item.id, item.name, '#808080', 'task');
+    const ctx = document.getElementById('categories-donut-chart').getContext('2d');
+    categoriesDonutChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: data.map(d => d.name),
+            datasets: [{
+                data: data.map(d => d.timeMs),
+                backgroundColor: data.map(d => d.color),
+                borderWidth: 2,
+                borderColor: getComputedStyle(document.documentElement).getPropertyValue('--bg-primary').trim(),
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '70%',
+            plugins: {
+                legend: {
+                    display: false // We use the list below
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const valueMs = context.parsed;
+                            const percentage = totalTimeMs > 0 ? (valueMs / totalTimeMs) * 100 : 0;
+                            return `${label}: ${formatShortDuration(valueMs)} (${percentage.toFixed(0)}%)`;
+                        }
+                    }
+                }
             }
         }
-    } else if (stopBtn) {
-        stopTimer();
-    } else if (checkbox) {
-        handlePlannerItemCheck(checkbox.dataset.id, checkbox.checked);
-    } else if (mainItem) {
-        const id = mainItem.dataset.id;
-        // NEW: Open the add/edit modal for ANY item type
-        showAddItemModal(id);
-    }
+    });
 }
 
-// NEW: Handle click on grid heatmap day
-function handleTrackGridClick(e) {
-    const dayCell = e.target.closest('.track-grid-day');
-    if (dayCell) {
-        const dateStr = dayCell.dataset.date;
-        if (dateStr) {
-            const clickedDate = new Date(dateStr + 'T00:00:00');
-            updateTimeRange('custom', clickedDate, clickedDate);
-            currentTrackView = 'list'; // Switch to list view
-            renderTrackPage();
+// MODIFICATION: Logic copied from app-main.js
+function getCategoriesDateRange() {
+    let { type, start, end } = currentCategoriesTimeRange;
+    return { start, end };
+}
+
+// MODIFICATION: Uses new date formatting
+function updateCategoriesNavText() {
+    const { type, start, end } = currentCategoriesTimeRange;
+    const btn = categoriesTimeRangeBtn; 
+
+    if (!btn) return; // Guard clause until HTML is updated
+
+    if (type === 'today') {
+        btn.textContent = formatDate(start); // DD/MM/YYYY
+    } else if (type === 'week') {
+        btn.textContent = `${formatDate(start)} - ${formatDate(end)}`; // DD/MM/YYYY - DD/MM/YYYY
+    } else if (type === 'month') {
+        // MM/YYYY format
+        const month = String(start.getMonth() + 1).padStart(2, '0');
+        const year = start.getFullYear();
+        btn.textContent = `${month}/${year}`; 
+    } else if (type === 'year') {
+        btn.textContent = start.getFullYear().toString(); // YYYY
+    } else if (type === 'all') {
+        btn.textContent = 'All Time';
+    } else if (type === 'custom') {
+        if (start.getTime() === end.getTime()) {
+            btn.textContent = formatDate(start); // DD/MM/YYYY
+        } else {
+            btn.textContent = `${formatDate(start)} - ${formatDate(end)}`; // DD/MM/YYYY - DD/MM/YYYY
         }
     }
 }
 
-async function handlePlannerItemCheck(id, isCompleted) {
-    if (!userId) return;
-    const item = plannerItems.get(id);
-    if (!item) return;
-    
-    try {
-        await plannerCollection().doc(id).update({ isCompleted });
-        item.isCompleted = isCompleted;
-        // Re-render both pages
-        renderTrackPage();
-        renderHomePage();
-    } catch (error) {
-        console.error("Error updating planner item: ", error);
-        alert("Failed to update item.");
+// MODIFICATION: Logic copied from app-main.js
+function navigateCategories(direction) {
+    let { type, start } = currentCategoriesTimeRange;
+    let newStart = new Date(start);
+
+    // Default to 'month' if range type isn't supported for navigation
+    if (type !== 'week' && type !== 'month' && type !== 'year') {
+        type = 'month';
+        newStart = new Date(currentCategoriesTimeRange.start); // Use the date stored in state
     }
+
+    if (type === 'week') {
+        newStart.setDate(newStart.getDate() + (7 * direction));
+        updateCategoriesTimeRange('week', newStart);
+    } else if (type === 'month') {
+        // Need to set date to 1st to avoid overflow issues (e.g., navigating from Jan 31 to Feb)
+        newStart.setDate(1); 
+        newStart.setMonth(newStart.getMonth() + direction);
+        updateCategoriesTimeRange('month', newStart);
+    } else if (type === 'year') {
+        newStart.setFullYear(newStart.getFullYear() + direction);
+        updateCategoriesTimeRange('year', newStart);
+    }
+    
+    renderCategoriesPage(); // Re-render categories
 }
 
-// MODIFIED: Update time range state and text
-function updateTimeRange(rangeType, customStart = null, customEnd = null) {
-    currentTrackTimeRange.type = rangeType;
+// MODIFICATION: Logic copied from app-main.js
+function updateCategoriesTimeRange(rangeType, customStart = null, customEnd = null) {
+    currentCategoriesTimeRange.type = rangeType;
     const now = new Date();
     let start = getStartOfDate(now);
     let end = getEndOfDate(now);
 
     switch (rangeType) {
         case 'today':
-            // Defaults are already set
             break;
         case 'week':
             const day = start.getDay();
@@ -750,8 +233,8 @@ function updateTimeRange(rangeType, customStart = null, customEnd = null) {
             end = getEndOfDate(end);
             break;
         case 'all':
-            start = new Date(2000, 0, 1); // Far in past
-            end = new Date(2100, 0, 1); // Far in future
+            start = getStartOfDate(new Date(2000, 0, 1));
+            end = getEndOfDate(new Date(2100, 0, 1));
             break;
         case 'custom':
             start = getStartOfDate(customStart);
@@ -759,296 +242,941 @@ function updateTimeRange(rangeType, customStart = null, customEnd = null) {
             break;
     }
     
-    currentTrackTimeRange.start = start;
-    currentTrackTimeRange.end = end;
+    currentCategoriesTimeRange.start = start;
+    currentCategoriesTimeRange.end = end;
+
+    updateCategoriesNavText(); // Update the button text
+}
+
+
+// --- NEW V24: Category CRUD Modals ---
+function showAddCategoryModal(categoryId = null) {
+    const form = document.getElementById('add-category-form');
+    form.reset();
     
-    // --- NEW: Update button text logic ---
-    if (rangeType === 'today') {
-        trackTimeRangeBtn.textContent = formatDate(start); // DD/MM/YYYY
-    } else if (rangeType === 'week') {
-        trackTimeRangeBtn.textContent = `${formatDate(start)} - ${formatDate(end)}`; // DD/MM/YYYY - DD/MM/YYYY
-    } else if (rangeType === 'month') {
-        trackTimeRangeBtn.textContent = `${String(start.getMonth() + 1).padStart(2, '0')}/${start.getFullYear()}`; // MM/YYYY
-    } else if (rangeType === 'year') {
-        trackTimeRangeBtn.textContent = start.getFullYear().toString(); // YYYY
-    } else if (rangeType === 'all') {
-        trackTimeRangeBtn.textContent = 'All Time';
-    } else if (rangeType === 'custom') {
-        if (start.getTime() === end.getTime()) {
-            trackTimeRangeBtn.textContent = formatDate(start); // DD/MM/YYYY
-        } else {
-            trackTimeRangeBtn.textContent = `${formatDate(start)} - ${formatDate(end)}`; // DD/MM/YYYY - DD/MM/YYYY
-        }
-    }
-}
+    const title = document.getElementById('add-category-title');
+    const nameInput = document.getElementById('add-category-name');
+    const iconPreview = document.getElementById('add-category-icon-preview');
+    const iconValue = document.getElementById('add-category-icon-name'); // BUG FIX: Corrected ID here
+    const colorInput = document.getElementById('add-category-color-input');
+    const saveBtn = document.getElementById('save-add-category-btn');
+    const editIdInput = document.getElementById('add-category-id'); // BUG FIX: Corrected ID here
 
-// NEW: Map Time Range (Prev/Next)
-function mapTimeRange(direction) {
-    let { type, start } = currentTrackTimeRange;
-    let newStart = new Date(start);
-
-    if (type === 'today' || (type === 'custom' && currentTrackTimeRange.end.getTime() - start.getTime() <= 86400000)) {
-        newStart.setDate(newStart.getDate() + direction);
-        updateTimeRange('custom', newStart, newStart);
-    } else if (type === 'week') {
-        newStart.setDate(newStart.getDate() + (7 * direction));
-        updateTimeRange('week', newStart);
-    } else if (type === 'month') {
-        newStart.setDate(1); 
-        newStart.setMonth(newStart.getMonth() + direction);
-        updateTimeRange('month', newStart);
-    } else if (type === 'year') {
-        newStart.setFullYear(newStart.getFullYear() + direction);
-        updateTimeRange('year', newStart);
-    } else {
-        return; // Don't map for 'all'
-    }
-    
-    renderTrackPage();
-}
-
-// --- Timer Logic (MODIFIED) ---
-function startTimer(activityId, activityName, activityColor, timerType = 'activity') { // Unchanged
-     if (currentTimer) return;
-     const now = Date.now();
-     currentTimer = { activityId, activityName, activityColor, startTime: now, intervalId: null, timerType };
-     
-     const savedTimer = { activityId, activityName, activityColor, startTime: now, userId: userId, timerType };
-     localStorage.setItem('activeTimer', JSON.stringify(savedTimer));
-     
-     setFlipClock("00:00:00"); 
-     previousTimeString = "00:00:00"; 
-     
-     currentTimer.intervalId = setInterval(updateTimerUI, 1000); 
-
-     timerBanner.classList.remove('hidden', 'closing', 'morphing-out'); 
-     requestAnimationFrame(() => { 
-        timerBanner.classList.add('active'); 
-     });
-
-     bannerActivityName.textContent = activityName;
-     updateTimerUI(); 
-     
-     renderHomePage();
-     renderTrackPage();
-}
-
-async function stopTimer() {
-     if (!currentTimer) return;
-     const timerToStop = { ...currentTimer }; 
-     currentTimer = null; 
-     
-     clearInterval(timerToStop.intervalId);
-     localStorage.removeItem('activeTimer');
-     
-     timerBanner.classList.add('closing');
-     timerBanner.classList.remove('active');
-
-     renderHomePage(); 
-     renderTrackPage();
-
-     const endTime = Date.now();
-     const durationMs = endTime - timerToStop.startTime;
-     
-     const timeLog = {
-         activityId: timerToStop.activityId,
-         activityName: timerToStop.activityName,
-         activityColor: timerToStop.activityColor,
-         startTime: timerToStop.startTime,
-         endTime: endTime,
-         durationMs: durationMs,
-         notes: "",
-         timerType: timerToStop.timerType || 'activity'
-     };
-
-     stopNoteInput.value = '';
-     
-     stopTimerCompletion = async (notes) => {
-        timeLog.notes = notes || ""; 
+    if (categoryId) {
+        const category = categories.get(categoryId);
+        if (!category) return;
         
-        if (!userId) {
-            alert("Error: Not signed in. Log not saved.");
-            return;
-        }
+        title.textContent = 'Edit Category';
+        saveBtn.textContent = 'Save Changes';
+        editIdInput.value = categoryId;
+        nameInput.value = category.name;
+        iconPreview.className = `bi ${category.iconName || 'bi-emoji-smile'}`;
+        iconValue.value = category.iconName || 'bi-emoji-smile';
+        colorInput.value = category.color || '#3b82f6';
+    } else {
+        title.textContent = 'Add New Category';
+        saveBtn.textContent = 'Save';
+        editIdInput.value = '';
+        iconPreview.className = 'bi bi-emoji-smile';
+        iconValue.value = 'bi-emoji-smile';
+        colorInput.value = '#3b82f6';
+    }
+    
+    addCategoryModal.classList.add('active');
+}
 
-        try {
-             const docRef = await timeLogsCollection().add(timeLog);
-             const newLog = { ...timeLog, id: docRef.id };
-             allTimeLogs.unshift(newLog); // Add to local cache
-             
-             if (timeLog.timerType === 'task') {
-                const task = plannerItems.get(timeLog.activityId);
-                if (task) {
-                    const newDuration = (task.trackedDurationMs || 0) + timeLog.durationMs;
-                    await plannerCollection().doc(timeLog.activityId).update({ trackedDurationMs: newDuration });
-                    task.trackedDurationMs = newDuration; // Update local cache
+function hideAddCategoryModal() {
+    addCategoryModal.classList.remove('active');
+}
+
+async function handleSaveCategory(e) {
+    e.preventDefault();
+    if (!userId) return;
+
+    const editId = document.getElementById('add-category-id').value; // Corrected ID here
+    const name = document.getElementById('add-category-name').value.trim();
+    const iconName = document.getElementById('add-category-icon-name').value;
+    const color = document.getElementById('add-category-color-input').value;
+
+    if (!name) {
+        alert("Please enter a category name.");
+        return;
+    }
+
+    const categoryData = { name, iconName, color };
+    
+    saveAddCategoryBtn.disabled = true;
+    saveAddCategoryBtn.textContent = 'Saving...';
+
+    try {
+        if (editId) {
+            await categoriesCollection().doc(editId).update(categoryData);
+            categories.set(editId, { ...categoryData, id: editId });
+        } else {
+            const docRef = await categoriesCollection().add(categoryData);
+            categories.set(docRef.id, { ...categoryData, id: docRef.id });
+        }
+        
+        hideAddCategoryModal();
+        renderCategoriesPage(); // Re-render the categories list
+        populateCategoryDatalist(); // Update datalist for activities
+    } catch (error) {
+        console.error("Error saving category: ", error);
+        alert("Failed to save category.");
+    } finally {
+        saveAddCategoryBtn.disabled = false;
+    }
+}
+
+
+// --- Log CRUD & Modals (MODIFIED) ---
+function showDeleteModal() {
+     let text = "Are you sure?";
+     if (logToDelete.type === 'category') { // NEW
+        text = "Delete category? All associated activities and logs will be permanently removed.";
+     }
+     else if (logToDelete.type === 'activity') {
+         text = "Delete activity? All associated logs will be removed.";
+     }
+     else if (logToDelete.type === 'log') { 
+         text = "Delete this time log?";
+     }
+     else if (logToDelete.type === 'plannerItem') { 
+         text = "Delete this item? If it's a task, all its tracked time will also be deleted."; 
+     }
+     deleteModalText.textContent = text; 
+     deleteModal.classList.add('active');
+}
+function hideDeleteModal() { deleteModal.classList.remove('active'); logToDelete = { id: null, type: null }; }
+
+// MODIFIED: Handle Confirm Delete
+async function handleConfirmDelete() {
+    if (!logToDelete.id || !logToDelete.type || !userId) return;
+    try {
+        if (logToDelete.type === 'category') {
+            // TODO: Implement category deletion logic
+            // 1. Delete category
+            // 2. Find all activities with this categoryId
+            // 3. For each activity, delete it
+            // 4. For each activity, delete all its logs
+            alert("Category deletion not fully implemented yet.");
+        
+        } else if (logToDelete.type === 'activity') {
+            const deletedActivityId = logToDelete.id;
+            await activitiesCollection().doc(deletedActivityId).delete();
+            const logsSnapshot = await timeLogsCollection().where('activityId', '==', deletedActivityId).get();
+            const batch = db.batch(); 
+            logsSnapshot.forEach(doc => batch.delete(doc.ref)); 
+            await batch.commit();
+            activities.delete(deletedActivityId); 
+            allTimeLogs = allTimeLogs.filter(log => log.activityId !== deletedActivityId);
+            analysisLogs = analysisLogs.filter(log => log.activityId !== deletedActivityId);
+            populateAnalysisFilter(); 
+            populateCategoryDatalist();
+            if(logDetailsModal.classList.contains('active')) { showLogDetailsModal(); }
+        
+        } else if (logToDelete.type === 'log') {
+            const deletedLogId = logToDelete.id; 
+            await timeLogsCollection().doc(deletedLogId).delete();
+            analysisLogs = analysisLogs.filter(log => log.id !== deletedLogId);
+            allTimeLogs = allTimeLogs.filter(log => log.id !== deletedLogId); 
+            const logElementToRemove = logDetailsList.querySelector(`.btn-delete-log[data-id="${deletedLogId}"]`)?.closest('div.bg-gray-50');
+            if (logElementToRemove) logElementToRemove.remove();
+            if (logDetailsList.children.length === 0) logDetailsList.innerHTML = `<p class="text-center text-muted">No logs for this period.</p>`;
+            loadAnalysisData();
+        
+        } else if (logToDelete.type === 'plannerItem') {
+            const deletedItemId = logToDelete.id;
+            const item = plannerItems.get(deletedItemId);
+
+            await plannerCollection().doc(deletedItemId).delete();
+            plannerItems.delete(deletedItemId);
+
+            if (item && item.type === 'task') {
+                const logsSnapshot = await timeLogsCollection()
+                    .where('activityId', '==', deletedItemId)
+                    .where('timerType', '==', 'task')
+                    .get();
+                
+                if (logsSnapshot.size > 0) {
+                    const batch = db.batch();
+                    logsSnapshot.forEach(doc => batch.delete(doc.ref));
+                    await batch.commit();
+                    allTimeLogs = allTimeLogs.filter(log => !(log.activityId === deletedItemId && log.timerType === 'task'));
+                    console.log(`Deleted ${logsSnapshot.size} associated task logs.`);
                 }
-             }
-             
-             if (pages.analysis.classList.contains('active')) {
-                loadAnalysisData(); 
-             }
-             if (pages.categories.classList.contains('active')) { // NEW
-                renderCategoriesPage();
-             }
-             renderTrackPage();
-             renderHomePage(); 
-        } catch (error) {
-             console.error("Error saving log: ", error);
-             alert("Failed to save the time log. Please check connection.");
-        } finally {
-            stopTimerCompletion = null; 
-        }
-     };
-
-     stopNoteModal.classList.add('active');
-     stopNoteInput.focus();
-}
-
-function handleSaveStopNote(e) {
-    if (e) e.preventDefault();
-    if (stopTimerCompletion) {
-        const notes = stopNoteInput.value.trim();
-        stopTimerCompletion(notes); 
-    }
-    stopNoteModal.classList.remove('active');
-    stopNoteInput.value = '';
-}
-
-// MODIFIED: Consolidated UI updater
-function updateTimerUI() {
-     if (!currentTimer) return; 
-     const elapsedMs = Date.now() - currentTimer.startTime;
-     const timeString = formatHHMMSS(elapsedMs);
-     
-     // 1. Banner (Hide on home page)
-     if (pages.home.classList.contains('active')) {
-        timerBanner.classList.remove('active');
-        timerBanner.classList.add('closing');
-     } else {
-        timerBanner.classList.add('active');
-        timerBanner.classList.remove('closing');
-        bannerTime.textContent = timeString; 
-     }
-     
-     // 2. Home Card
-     if (pages.home.classList.contains('active')) {
-        homeTimerTime.textContent = timeString;
-     }
-     
-     // 3. Track Page (if list view)
-     if (pages.track.classList.contains('active') && currentTrackView === 'list') {
-        const timerType = currentTimer.timerType === 'task' ? 'task' : 'activity';
-        const runningItemEl = trackContentArea.querySelector(`.track-item-action-btn.stop[data-id="${currentTimer.activityId}"][data-type="${timerType}"]`);
-        if (runningItemEl) {
-            const timerEl = runningItemEl.querySelector('.track-item-timer');
-            if (timerEl) {
-                timerEl.textContent = timeString.substring(3); // MM:SS
             }
-        }
-     }
+        } 
+        
+        // Re-render all
+        renderHomePage();
+        renderTrackPage();
+        renderCategoriesPage(); // NEW
 
-     // 4. Flip Clock (if active)
-     if (flipClockPage.classList.contains('active')) {
-        updateFlipClock(timeString);
-     }
+    } catch (error) { 
+        console.error("Error deleting item: ", error); 
+        alert("Deletion failed."); 
+    }
+    finally { 
+        hideDeleteModal(); 
+    }
 }
 
-// --- Flip Clock UI (No Changes) ---
-function setFlipClock(timeString) {
-    const digits = timeString.replace(/:/g, ''); 
-    const digitKeys = ['h1', 'h2', 'm1', 'm2', 's1', 's2'];
-    for(let i = 0; i < digitKeys.length; i++) {
-        const key = digitKeys[i];
-        const el = flipDigitElements[key];
-        const digit = digits[i];
-        if (el) {
-            el.querySelector('.card-top span').textContent = digit;
-            el.querySelector('.card-bottom span').textContent = digit;
-            el.querySelector('.flip-top span').textContent = digit;
-            el.querySelector('.flip-bottom span').textContent = digit;
-        }
-    }
+function showManualEntryModal() {
+     manualActivitySelect.innerHTML = '';
+     if (activities.size === 0) { manualActivitySelect.innerHTML = '<option value="">Create activity first</option>'; }
+     activities.forEach((act, id) => { manualActivitySelect.innerHTML += `<option value="${id}" data-name="${act.name}" data-color="${act.color}">${act.name}</option>`; });
+     manualDateInput.value = getTodayString(); manualStartTimeInput.value = ''; manualEndTimeInput.value = ''; manualNotesInput.value = '';
+     manualEntryModal.classList.add('active');
 }
-function updateFlipClock(timeString) {
-    const newDigits = timeString.replace(/:/g, ''); 
-    const oldDigits = previousTimeString.replace(/:/g, ''); 
-    const digitKeys = ['h1', 'h2', 'm1', 'm2', 's1', 's2'];
-    for(let i = 0; i < digitKeys.length; i++) {
-        if (newDigits[i] !== oldDigits[i]) {
-            const key = digitKeys[i];
-            const el = flipDigitElements[key];
-            if (el) {
-                triggerFlip(el, oldDigits[i], newDigits[i]);
-            }
-        }
-    }
-    previousTimeString = timeString; 
-}
-function triggerFlip(digitElement, oldDigit, newDigit) {
-    if (digitElement.classList.contains('flipping')) {
-        digitElement.querySelector('.card-top span').textContent = newDigit;
-        digitElement.querySelector('.flip-bottom span').textContent = newDigit;
-        return; 
-    }
-    const cardTopSpan = digitElement.querySelector('.card-top span');
-    const cardBottomSpan = digitElement.querySelector('.card-bottom span');
-    const flipTopSpan = digitElement.querySelector('.flip-top span');
-    const flipBottomSpan = digitElement.querySelector('.flip-bottom span');
-    const cardFlip = digitElement.querySelector('.card-flip');
-    cardTopSpan.textContent = newDigit;    
-    cardBottomSpan.textContent = oldDigit; 
-    flipTopSpan.textContent = oldDigit;    
-    flipBottomSpan.textContent = newDigit; 
-    digitElement.classList.add('flipping');
-    const onFlipEnd = () => {
-        cardBottomSpan.textContent = newDigit;
-        cardFlip.style.transition = 'none';
-        digitElement.classList.remove('flipping');
-        flipTopSpan.textContent = newDigit;
-        void cardFlip.offsetHeight; 
-        cardFlip.style.transition = ''; 
-        cardFlip.removeEventListener('transitionend', onFlipEnd);
+function hideManualEntryModal() { manualEntryModal.classList.remove('active'); }
+async function handleSaveManualEntry(e) {
+     e.preventDefault(); if (!userId) return;
+     const selOpt = manualActivitySelect.querySelector(`option[value="${manualActivitySelect.value}"]`);
+     const actId = manualActivitySelect.value; const actName = selOpt ? selOpt.dataset.name : 'Unknown'; const actColor = selOpt ? selOpt.dataset.color : '#808080';
+     const date = manualDateInput.value; const startTime = manualStartTimeInput.value; const endTime = manualEndTimeInput.value; const notes = manualNotesInput.value.trim();
+     if (!actId || !date || !startTime || !endTime) { alert("Fill all required fields."); return; }
+     const startDT = new Date(`${date}T${startTime}`); const endDT = new Date(`${date}T${endTime}`);
+     if (endDT <= startDT) { alert("End time must be after start."); return; }
+     const startMs = startDT.getTime(); const endMs = endDT.getTime(); const durMs = endMs - startMs;
+     const timeLog = { 
+         activityId:actId, 
+         activityName:actName, 
+         activityColor:actColor, 
+         startTime: startMs, 
+         endTime: endMs, 
+         durationMs: durMs, 
+         notes: notes,
+         timerType: 'activity' // Manual entries are always 'activity'
     };
-    cardFlip.addEventListener('transitionend', onFlipEnd);
-    setTimeout(() => {
-        if (digitElement.classList.contains('flipping')) {
-            onFlipEnd(); 
-        }
-    }, 550); 
-}
-function showFlipClock() {
-     if (!currentTimer) return;
-     flipClockActivity.textContent = currentTimer.activityName;
-     const elapsedMs = Date.now() - currentTimer.startTime;
-     const timeString = formatHHMMSS(elapsedMs);
-     setFlipClock(timeString); 
-     previousTimeString = timeString; 
-     timerBanner.classList.add('morphing-out');
-     timerBanner.classList.remove('active'); 
-     flipClockPage.classList.remove('animating-out'); 
-     flipClockPage.style.display = 'flex'; 
-     requestAnimationFrame(() => {
-        flipClockPage.classList.add('animating-in', 'active');
-     });
-     setTimeout(() => { mainApp.style.display = 'none'; }, 50); 
-     setTimeout(() => { timerBanner.classList.remove('morphing-out'); }, 300); 
-}
-function hideFlipClock() {
-    flipClockPage.classList.remove('animating-in');
-    flipClockPage.classList.add('animating-out');
-    flipClockPage.classList.remove('active');
-    mainApp.style.display = 'block';
-    previousTimeString = "00:00:00";
-    setTimeout(() => {
-        flipClockPage.classList.remove('animating-out');
-        flipClockPage.style.display = 'none'; 
-        if (currentTimer) {
-             timerBanner.classList.remove('hidden', 'closing', 'morphing-out'); 
-             requestAnimationFrame(() => {
-                 timerBanner.classList.add('active'); 
-             });
-        }
-    }, 200); 
+     try {
+         const docRef = await timeLogsCollection().add(timeLog);
+         allTimeLogs.unshift({ ...timeLog, id: docRef.id }); // Add to cache
+         
+         renderTrackPage(); 
+         renderHomePage(); 
+         renderCategoriesPage(); // NEW
+         if(pages.analysis.classList.contains('active')) {
+            loadAnalysisData();
+         }
+         hideManualEntryModal();
+     } catch (error) { console.error("Error saving manual entry: ", error); alert("Save failed."); }
 }
 
+ function showEditLogModal(logId) {
+     let log = allTimeLogs.find(l => l.id === logId);
+     if (!log) { 
+         log = analysisLogs.find(l => l.id === logId); 
+     }
+     if (!log) {
+         alert("Cannot find log to edit."); return; 
+     } 
+     logToEditId = log.id;
+     const startD = new Date(log.startTime); const endD = new Date(log.endTime);
+     let itemName = "Unknown";
+     if (log.timerType === 'task') {
+        itemName = plannerItems.get(log.activityId)?.name || log.activityName;
+     } else {
+        itemName = activities.get(log.activityId)?.name || log.activityName;
+     }
+     editActivityNameInput.value = log.timerType === 'task' ? `Task: ${itemName}` : itemName;
+     editDateInput.value = `${startD.getFullYear()}-${String(startD.getMonth() + 1).padStart(2, '0')}-${String(startD.getDate()).padStart(2, '0')}`;
+     editStartTimeInput.value = `${String(startD.getHours()).padStart(2, '0')}:${String(startD.getMinutes()).padStart(2, '0')}`;
+     editEndTimeInput.value = `${String(endD.getHours()).padStart(2, '0')}:${String(endD.getMinutes()).padStart(2, '0')}`;
+     editNotesInput.value = log.notes || ""; 
+     const isTask = log.timerType === 'task';
+     editDateInput.disabled = isTask;
+     editStartTimeInput.disabled = isTask;
+     editEndTimeInput.disabled = isTask;
+     editLogModal.classList.add('active');
+}
+function hideEditLogModal() { editLogModal.classList.remove('active'); logToEditId = null; }
+async function handleSaveEditLog(e) {
+     e.preventDefault(); if (!logToEditId || !userId) return;
+     const originalLog = allTimeLogs.find(l => l.id === logToEditId);
+     if (originalLog && originalLog.timerType === 'task') {
+        alert("Editing task logs is not supported yet. You can delete and re-track it.");
+        hideEditLogModal();
+        return;
+     }
+     const date = editDateInput.value; const startTime = editStartTimeInput.value; const endTime = editEndTimeInput.value; const notes = editNotesInput.value.trim();
+     const startDT = new Date(`${date}T${startTime}`); const endDT = new Date(`${date}T${endTime}`);
+     if (endDT <= startDT) { alert("End time must be after start."); return; }
+     const startMs = startDT.getTime(); const endMs = endDT.getTime(); const durMs = endMs - startMs;
+     const updatedData = { startTime: startMs, endTime: endMs, durationMs: durMs, notes: notes };
+     try {
+         await timeLogsCollection().doc(logToEditId).update(updatedData);
+         const updateCache = (log) => {
+             if (log.id === logToEditId) {
+                 return { ...log, ...updatedData };
+             }
+             return log;
+         };
+         allTimeLogs = allTimeLogs.map(updateCache);
+         analysisLogs = analysisLogs.map(updateCache);
+         
+         hideEditLogModal(); 
+         renderTrackPage();
+         renderHomePage();
+         renderCategoriesPage(); // NEW
+         if (logDetailsModal.classList.contains('active')) showLogDetailsModal();
+         if (pages.analysis.classList.contains('active')) renderAnalysisVisuals(analysisLogs, calculateActivityTotals(analysisLogs));
+     } catch (error) { console.error("Error updating log: ", error); alert("Update failed."); }
+}
+
+// --- Analysis Page (MODIFIED) ---
+function setAnalysisView(view) {
+     currentAnalysisView = view; 
+     analysisTabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.view === view));
+     pages.analysis.classList.remove('view-daily', 'view-weekly', 'view-monthly');
+     pages.analysis.classList.add(`view-${view}`);
+     if (view === 'monthly') {
+        heatmapCard.style.display = 'block';
+        analysisFilterContainer.style.display = 'block';
+        barChartCard.style.display = 'none'; 
+        pieChartCard.style.display = 'none'; 
+     } else if (view === 'weekly') {
+        heatmapCard.style.display = 'none';
+        analysisFilterContainer.style.display = 'block';
+        barChartCard.style.display = 'block'; 
+        pieChartCard.style.display = 'none'; 
+     } else { // Daily
+        heatmapCard.style.display = 'none';
+        analysisFilterContainer.style.display = 'none';
+        barChartCard.style.display = 'none'; 
+        pieChartCard.style.display = 'none';
+     }
+     loadAnalysisData(); 
+}
+
+function navigateAnalysis(direction) {
+    if (currentAnalysisView === 'weekly') {
+        currentAnalysisDate.setDate(currentAnalysisDate.getDate() + (7 * direction));
+    } else if (currentAnalysisView === 'monthly') {
+        const newMonth = currentAnalysisDate.getMonth() + direction;
+        currentAnalysisDate.setDate(1); 
+        currentAnalysisDate.setMonth(newMonth);
+    }
+    loadAnalysisData();
+}
+
+function updateAnalysisNavText(startDate, endDate) {
+    const dateFormat = { day: '2-digit', month: '2-digit', year: 'numeric' };
+    if (currentAnalysisView === 'weekly') {
+        analysisNavText.textContent = `${startDate.toLocaleDateString('en-GB', dateFormat)} - ${endDate.toLocaleDateString('en-GB', dateFormat)}`;
+    } else if (currentAnalysisView === 'monthly') {
+        analysisNavText.textContent = startDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    }
+}
+
+function getAnalysisDateRange() {
+     const selD = new Date(currentAnalysisDate); 
+     let startD = new Date(selD); let endD = new Date(selD);
+     switch (currentAnalysisView) {
+         case 'daily': 
+            startD.setHours(0,0,0,0); 
+            endD.setHours(23,59,59,999); 
+            break;
+         case 'weekly': 
+            const day = startD.getDay(); 
+            const diff = startD.getDate() - day + (day === 0 ? -6 : 1); 
+            startD = new Date(startD.setDate(diff));
+            startD.setHours(0,0,0,0); 
+            endD = new Date(startD); 
+            endD.setDate(startD.getDate() + 6); 
+            endD.setHours(23,59,59,999); 
+            break;
+         case 'monthly': 
+            startD = new Date(startD.getFullYear(), startD.getMonth(), 1); 
+            startD.setHours(0,0,0,0); 
+            endD = new Date(startD.getFullYear(), startD.getMonth() + 1, 0); 
+            endD.setHours(23,59,59,999); 
+            break;
+     }
+     updateAnalysisNavText(startD, endD); 
+     return { startDate: startD, endDate: endD };
+}
+
+function patchActivitiesFromLogs(logs) {
+    let newActivitiesFound = false;
+    logs.forEach(log => {
+        if (log.timerType === 'task') return; 
+        if (log.activityId && !activities.has(log.activityId)) {
+            activities.set(log.activityId, {
+                id: log.activityId,
+                name: log.activityName || "Unknown Activity",
+                color: log.activityColor || "#808080",
+                categoryId: 'uncategorized', // NEW
+                goal: { value: 0, period: 'none' }, 
+                order: Infinity
+            });
+            newActivitiesFound = true;
+        }
+    });
+    return newActivitiesFound;
+}
+
+async function loadAnalysisData() {
+    if (!userId) return; 
+    const { startDate, endDate } = getAnalysisDateRange();
+    
+    analysisLogs = allTimeLogs.filter(log => 
+        log.startTime >= startDate.getTime() && log.startTime <= endDate.getTime()
+    );
+        
+    const newActivities = patchActivitiesFromLogs(analysisLogs);
+    if (newActivities) {
+        populateAnalysisFilter();
+    }
+
+    const activityTotals = calculateActivityTotals(analysisLogs);
+    renderAnalysisRanking(activityTotals); 
+    renderAnalysisVisuals(analysisLogs, activityTotals); 
+}
+
+// MODIFIED: calculateActivityTotals (group by CATEGORY)
+function calculateActivityTotals(logs) {
+    const categoryTotals = new Map();
+    
+    logs.forEach(log => {
+        let category, categoryId;
+        
+        if (log.timerType === 'task') {
+            categoryId = 'task'; // Group all tasks together
+            category = { name: 'Tasks', color: '#808080' };
+        } else {
+            const activity = activities.get(log.activityId);
+            categoryId = activity?.categoryId || 'uncategorized';
+            category = categories.get(categoryId) || { name: 'Uncategorized', color: '#808080' };
+        }
+        
+        const current = categoryTotals.get(categoryId) || { durationMs: 0, name: category.name, color: category.color };
+        current.durationMs += log.durationMs; 
+        current.color = category.color; // Ensure color is set from Category object
+        categoryTotals.set(categoryId, current);
+    });
+    return categoryTotals;
+}
+
+// MODIFIED: renderAnalysisRanking (group by CATEGORY)
+ function renderAnalysisRanking(categoryTotals) {
+     let titleView = currentAnalysisView.charAt(0).toUpperCase() + currentAnalysisView.slice(1);
+     rankingTitle.textContent = titleView + ' Ranking';
+     rankingList.innerHTML = ''; 
+     if (categoryTotals.size === 0) { 
+         rankingList.innerHTML = `<p class="text-center text-muted">No time tracked.</p>`; 
+         return; 
+     } 
+     const sorted = [...categoryTotals.values()].sort((a, b) => b.durationMs - a.durationMs);
+     const maxTime = sorted[0].durationMs;
+     if (maxTime <= 0) {
+         rankingList.innerHTML = `<p class="text-center text-muted">No time tracked.</p>`; 
+         return;
+     }
+     sorted.forEach((data) => {
+         const percentage = (data.durationMs / maxTime) * 100;
+         const itemHtml = `
+            <div class="ranking-item">
+                <span class="ranking-item-dot" style="background-color: ${data.color}"></span>
+                <span class="ranking-item-name" title="${data.name}">${data.name}</span>
+                <span class="ranking-item-time">${formatShortDuration(data.durationMs)}</span>
+                <div class="ranking-bar-bg">
+                    <div class="ranking-bar-fill" style="width: ${percentage}%; background-color: ${data.color}"></div>
+                </div>
+            </div>
+         `;
+         rankingList.insertAdjacentHTML('beforeend', itemHtml); 
+     });
+}
+
+// MODIFIED: renderAnalysisVisuals (filter logs)
+function renderAnalysisVisuals(rawLogs, activityTotals) {
+     if (barChartInstance) { barChartInstance.destroy(); barChartInstance = null; }
+     if (pieChartInstance) { pieChartInstance.destroy(); pieChartInstance = null; }
+     
+     // Filter out tasks from chart views
+     const activityLogs = rawLogs.filter(log => log.timerType !== 'task');
+
+     switch (currentAnalysisView) {
+        case 'daily':
+            break;
+        case 'weekly':
+            renderWeeklyChart(activityLogs, barChartCanvas.getContext('2d')); 
+            break;
+        case 'monthly':
+            renderMonthlyHeatmap(activityLogs); 
+            break;
+     }
+}
+
+function renderWeeklyChart(activityLogs, barCtx) { 
+    const selectedActivityId = analysisActivityFilter.value;
+    const selectedActivityName = analysisActivityFilter.options[analysisActivityFilter.selectedIndex].text;
+
+    const filteredLogs = selectedActivityId === 'all' 
+        ? activityLogs 
+        : activityLogs.filter(log => log.activityId === selectedActivityId);
+
+    barChartTitle.textContent = selectedActivityId === 'all' ? 'Weekly Activity Breakdown' : `Weekly: ${selectedActivityName}`;
+    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const dataByActivity = new Map(); 
+    filteredLogs.forEach(log => {
+        let dayIndex = new Date(log.startTime).getDay();
+        dayIndex = (dayIndex === 0) ? 6 : (dayIndex - 1); 
+        const activity = activities.get(log.activityId);
+        const activityName = activity?.name || log.activityName;
+        const color = activity?.color || log.activityColor || '#808080';
+        let entry = dataByActivity.get(activityName);
+        if (!entry) {
+            entry = { color: color, data: [0, 0, 0, 0, 0, 0, 0] };
+            dataByActivity.set(activityName, entry);
+        }
+        entry.data[dayIndex] += (log.durationMs / 3600000); 
+    });
+    const datasets = Array.from(dataByActivity.entries()).map(([name, d]) => ({
+        label: name,
+        data: d.data.map(h => h.toFixed(2)),
+        backgroundColor: d.color,
+    }));
+    barChartInstance = new Chart(barChartCanvas, {
+        type: 'bar',
+        data: { labels, datasets },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { 
+                legend: { display: true, position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) { label += ': '; }
+                            if (context.parsed.y !== null) { label += context.parsed.y.toFixed(2) + 'h'; }
+                            return label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Hours' } },
+                x: { stacked: true, grid: { display: false } }
+            }
+        }
+    });
+}
+
+function renderMonthlyHeatmap(activityLogs) { 
+    heatmapGrid.innerHTML = ''; 
+    const { startDate, endDate } = getAnalysisDateRange();
+    const selectedActivityId = analysisActivityFilter.value;
+    const selectedActivityName = analysisActivityFilter.options[analysisActivityFilter.selectedIndex].text;
+    heatmapTitle.textContent = selectedActivityId === 'all' ? 'Monthly Activity' : `Monthly Activity: ${selectedActivityName}`;
+    const filteredLogs = selectedActivityId === 'all' 
+        ? activityLogs 
+        : activityLogs.filter(log => log.activityId === selectedActivityId);
+    const numDaysInMonth = endDate.getDate();
+    const firstDayOfMonth = new Date(startDate);
+    const hoursByDay = new Map();
+    filteredLogs.forEach(log => {
+        const day = new Date(log.startTime).getDate(); 
+        const hours = log.durationMs / 3600000;
+        hoursByDay.set(day, (hoursByDay.get(day) || 0) + hours);
+    });
+    
+    const maxHours = Math.max(0, ...hoursByDay.values());
+    
+    let firstDayIndex = firstDayOfMonth.getDay();
+    firstDayIndex = (firstDayIndex === 0) ? 6 : (firstDayIndex - 1); 
+    for (let i = 0; i < firstDayIndex; i++) {
+        heatmapGrid.innerHTML += '<div class="heatmap-day-padding"></div>';
+    }
+    for (let i = 1; i <= numDaysInMonth; i++) {
+        const hours = hoursByDay.get(i) || 0;
+        const level = getHeatmapLevel(hours, maxHours); // Use modified heatmap level
+        const dateStr = new Date(startDate.getFullYear(), startDate.getMonth(), i).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+        const title = `${dateStr}: ${hours.toFixed(1)} hours${selectedActivityId === 'all' ? '' : ` (${selectedActivityName})`}`;
+        heatmapGrid.innerHTML += `<div class="heatmap-day" data-level="${level}" title="${title}"></div>`;
+    }
+}
+
+// getHeatmapLevel is replaced by the one in renderTrackGrid
+function getHeatmapLevel(hours, maxHours) {
+    if (hours <= 0) return 0;
+    if (maxHours <= 0) return 1; // Avoid division by zero
+    const ratio = hours / maxHours;
+    if (ratio < 0.25) return 1;
+    if (ratio < 0.5) return 2;
+    if (ratio < 0.75) return 3;
+    return 4;
+}
+
+
+// --- Log Details Modal (Unchanged) ---
+function showLogDetailsModal() {
+    logDetailsList.innerHTML = ''; 
+    if (analysisLogs.length === 0) {
+        logDetailsList.innerHTML = `<p class="text-center text-muted">No logs for this period.</p>`;
+    } else {
+        const sortedLogs = [...analysisLogs].sort((a, b) => b.startTime - a.startTime);
+        sortedLogs.forEach((log, index) => {
+            const start = new Date(log.startTime);
+            const startStr = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const end = new Date(log.endTime);
+            const endStr = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            let activityName, activityColor;
+            if (log.timerType === 'task') {
+                const task = plannerItems.get(log.activityId);
+                activityName = `Task: ${task?.name || log.activityName}`;
+                activityColor = 'var(--text-secondary)'; 
+            } else {
+                const activity = activities.get(log.activityId);
+                activityName = activity?.name || log.activityName;
+                activityColor = activity?.color || log.activityColor || 'var(--text-primary)';
+            }
+            const logHtml = `
+                <div class="bg-gray-50 p-3 rounded-lg flex justify-between items-center log-item-pop" style="animation-delay: ${index * 50}ms">
+                    <div>
+                        <p class="font-semibold" style="color: ${activityColor}">${activityName}</p> 
+                        <p class="text-sm">${startStr} - ${endStr} (${formatShortDuration(log.durationMs)})</p> 
+                        ${log.notes ? `<p class="text-xs italic mt-1" style="color: var(--text-muted);">${log.notes}</p>` : ''} 
+                    </div>
+                    <div class="flex space-x-2">
+                        <button class="btn-edit-log p-2 text-gray-500 hover:text-blue-600 ${log.timerType === 'task' ? 'opacity-50 cursor-not-allowed' : ''}" data-id="${log.id}" ${log.timerType === 'task' ? 'disabled' : ''}>
+                            <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.536l12.232-12.232z"></path></svg>
+                        </button>
+                        <button class="btn-delete-log p-2 text-gray-500 hover:text-red-600" data-id="${log.id}">
+                            <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+            logDetailsList.insertAdjacentHTML('beforeend', logHtml);
+            const newItemEl = logDetailsList.lastElementChild;
+            if (newItemEl) {
+                setTimeout(() => {
+                    if (newItemEl) { 
+                        newItemEl.classList.remove('log-item-pop');
+                        newItemEl.style.animationDelay = '';
+                    }
+                }, 300 + (index * 50)); 
+            }
+        });
+    }
+    if (!logDetailsModal.classList.contains('active')) {
+        logDetailsModal.classList.add('active');
+    }
+}
+function hideLogDetailsModal() { 
+    logDetailsModal.classList.remove('active'); 
+}
+function handleLogDetailsClick(e) {
+    const editBtn = e.target.closest('.btn-edit-log');
+    const deleteBtn = e.target.closest('.btn-delete-log');
+    if (editBtn && !editBtn.disabled) {
+        showEditLogModal(editBtn.dataset.id);
+        hideLogDetailsModal(); 
+    } else if (deleteBtn) {
+        logToDelete = { id: deleteBtn.dataset.id, type: 'log' };
+        showDeleteModal();
+    }
+}
+
+// --- Old Planner Functions (DELETED) ---
+// ... All deleted ...
+
+// --- NEW Modal Functions ---
+
+// NEW: Show Add Item Modal
+function showAddItemModal(itemIdToEdit = null) {
+    addItemForm.reset();
+    addItemForm.dataset.editId = '';
+    
+    // --- 1. Get all element references ---
+    const itemTypeInput = addItemForm.querySelector('#add-item-type');
+    const typeButtons = addItemForm.querySelectorAll('.add-item-type-btn');
+    const commonFieldsContainer = addItemForm.querySelector('#add-item-common-fields');
+    const dateContainer = addItemForm.querySelector('#add-item-date-container');
+    const taskDateGroup = addItemForm.querySelector('#form-group-task');
+    const deadlineDateGroup = addItemForm.querySelector('#form-group-deadline');
+    const notifyGroup = addItemForm.querySelector('#form-group-notifications');
+    const saveBtn = addItemForm.querySelector('#save-add-item-btn');
+    
+    // --- 2. Dynamically build form HTML ---
+    commonFieldsContainer.innerHTML = `
+        <input type="hidden" id="add-item-id" value="${itemIdToEdit || ''}">
+        
+        <!-- Name -->
+        <div>
+            <label for="add-item-name" class="block text-sm font-medium mb-2">Name</label>
+            <input type="text" id="add-item-name" placeholder="E.g., Finish report" class="w-full" maxlength="40">
+        </div>
+
+        <!-- Activity/Goal Fields (Icon, Color, Category, Goal) -->
+        <div id="form-group-goal" class="space-y-4 hidden">
+            <div class="flex gap-2">
+                <button type="button" id="add-item-icon-btn" class="icon-input-btn p-3" title="Select Icon">
+                    <i id="add-item-icon-preview" class="bi bi-emoji-smile"></i>
+                </button>
+                <input type="hidden" id="add-item-icon-value" value="bi-emoji-smile">
+                <input type="color" id="add-item-color" value="#3b82f6" title="Select activity color" class="w-16 h-16">
+            </div>
+            <div>
+                <label for="add-item-category" class="block text-sm font-medium mb-2">Category</label>
+                <select id="add-item-category" class="w-full">
+                    <option value="uncategorized">No Category</option>
+                    ${Array.from(categories.values()).map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-2">Goal</label>
+                <div class="flex gap-2">
+                    <input type="number" id="add-item-goal-value" min="0" step="0.5" placeholder="E.g., 5" class="w-1/2">
+                    <select id="add-item-goal-period" class="w-1/2">
+                        <option value="none">None</option>
+                        <option value="daily">per Day</option>
+                        <option value="weekly">per Week</option>
+                        <option value="monthly">per Month</option>
+                        <option value="yearly">per Year</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Task Fields -->
+        <div id="form-group-task-only" class="space-y-4 hidden">
+            <div>
+                <label for="add-item-target-hours" class="block text-sm font-medium mb-2">Target (Hours)</label>
+                <input type="number" id="add-item-target-hours" min="0" step="0.5" placeholder="E.g., 4" class="w-full">
+            </div>
+        </div>
+
+        <!-- Deadline Fields -->
+        <div id="form-group-deadline-only" class="space-y-4 hidden">
+             <div>
+                <label for="add-item-notes" class="block text-sm font-medium mb-2">Notes (Optional)</label>
+                <textarea id="add-item-notes" rows="2" class="w-full"></textarea>
+            </div>
+        </div>
+    `;
+
+    // --- 3. Add Event Listeners (must be done *after* innerHTML) ---
+    addItemForm.querySelector('#add-item-icon-btn').addEventListener('click', () => {
+        showIconPicker(
+            addItemForm.querySelector('#add-item-icon-btn'), 
+            addItemForm.querySelector('#add-item-icon-value'),
+            addItemForm.querySelector('#add-item-icon-preview')
+        );
+    });
+    
+    typeButtons.forEach(btn => btn.addEventListener('click', (e) => {
+        const type = e.target.dataset.type;
+        itemTypeInput.value = type;
+        toggleAddItemForm(type);
+    }));
+
+    // --- 4. Populate Form if Editing ---
+    let itemType = 'goal'; // Default for adding
+    
+    if (itemIdToEdit) {
+        addItemForm.dataset.editId = itemIdToEdit;
+        saveBtn.textContent = 'Save Changes';
+        
+        const plannerItem = plannerItems.get(itemIdToEdit);
+        const activity = activities.get(itemIdToEdit);
+
+        if (plannerItem) {
+            // It's a Task or Deadline
+            itemType = plannerItem.type;
+            document.getElementById('add-item-name').value = plannerItem.name;
+            notifyGroup.querySelector('#add-item-notify').value = plannerItem.notifyDays || 'none';
+            
+            if (itemType === 'task') {
+                document.getElementById('add-item-target-hours').value = plannerItem.targetHours || '';
+                // TODO: Populate datetime-local
+            } else { // deadline
+                document.getElementById('add-item-notes').value = plannerItem.notes || '';
+                // TODO: Populate date and time
+            }
+        } else if (activity) {
+            // It's a Goal
+            itemType = 'goal';
+            document.getElementById('add-item-name').value = activity.name;
+            document.getElementById('add-item-icon-preview').className = `bi ${activity.iconName || 'bi-emoji-smile'}`;
+            document.getElementById('add-item-icon-value').value = activity.iconName || 'bi-emoji-smile';
+            document.getElementById('add-item-color').value = activity.color || '#3b82f6';
+            document.getElementById('add-item-category').value = activity.categoryId || 'uncategorized';
+            document.getElementById('add-item-goal-value').value = activity.goal?.value || '';
+            document.getElementById('add-item-goal-period').value = activity.goal?.period || 'none';
+        }
+        
+    } else {
+        // This is an add
+        saveBtn.textContent = 'Add Item';
+        // TODO: Set default date/time values
+    }
+
+    // --- 5. Set Initial State & Show Modal ---
+    itemTypeInput.value = itemType;
+    toggleAddItemForm(itemType);
+    addItemModal.classList.add('active');
+}
+
+function toggleAddItemForm(type) {
+    // 1. Set Button Active State
+    addItemForm.querySelectorAll('.add-item-type-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.type === type);
+    });
+
+    // 2. Show/Hide Form Groups
+    document.getElementById('form-group-goal').classList.toggle('hidden', type !== 'goal');
+    document.getElementById('form-group-task-only').classList.toggle('hidden', type !== 'task');
+    document.getElementById('form-group-deadline-only').classList.toggle('hidden', type !== 'deadline');
+    
+    document.getElementById('add-item-date-container').classList.toggle('hidden', type === 'goal');
+    document.getElementById('form-group-task').classList.toggle('hidden', type !== 'task');
+    document.getElementById('form-group-deadline').classList.toggle('hidden', type !== 'deadline');
+    document.getElementById('form-group-notifications').classList.toggle('hidden', type === 'goal');
+}
+
+
+function hideAddItemModal() {
+    addItemModal.classList.remove('active');
+}
+
+// NEW: Handle Add/Edit Item Submission
+async function handleAddItem(e) {
+    e.preventDefault();
+    if (!userId) return;
+
+    const type = document.getElementById('add-item-type').value;
+    const name = document.getElementById('add-item-name').value.trim();
+    const editId = addItemForm.dataset.editId;
+    
+    if (!name) {
+        alert("Please enter a name.");
+        return;
+    }
+
+    saveAddItemBtn.disabled = true;
+    saveAddItemBtn.textContent = 'Saving...';
+    
+    try {
+        if (type === 'goal') {
+            const newActivity = {
+                name: name,
+                iconName: document.getElementById('add-item-icon-value').value || 'bi-emoji-smile',
+                color: document.getElementById('add-item-color').value,
+                categoryId: document.getElementById('add-item-category').value,
+                goal: {
+                    value: parseFloat(document.getElementById('add-item-goal-value').value) || 0,
+                    period: document.getElementById('add-item-goal-period').value || 'none'
+                },
+                order: editId ? (activities.get(editId)?.order || 0) : (activities.size || 0)
+            };
+
+            if (editId) {
+                await activitiesCollection().doc(editId).update(newActivity);
+                activities.set(editId, { ...activities.get(editId), ...newActivity });
+            } else {
+                const docRef = await activitiesCollection().add(newActivity);
+                activities.set(docRef.id, { ...newActivity, id: docRef.id });
+            }
+            await loadActivities(); // Reload to refresh datalists etc.
+
+        } else { // 'task' or 'deadline'
+            // TODO: Get start/due dates from new pickers
+            const newPlannerItem = {
+                name: name,
+                type: type,
+                dueDate: document.getElementById('add-item-due-date')?.value || getTodayString(), // Placeholder
+                // startDate: ...
+                notifyDays: document.getElementById('add-item-notify').value || 'none',
+                targetHours: type === 'task' ? (parseFloat(document.getElementById('add-item-target-hours').value) || 0) : 0,
+                notes: type === 'deadline' ? (document.getElementById('add-item-notes').value.trim()) : '',
+                isCompleted: editId ? (plannerItems.get(editId)?.isCompleted || false) : false,
+                trackedDurationMs: editId ? (plannerItems.get(editId)?.trackedDurationMs || 0) : 0,
+                createdAt: editId ? (plannerItems.get(editId)?.createdAt || Date.now()) : Date.now()
+            };
+
+            if (editId) {
+                await plannerCollection().doc(editId).update(newPlannerItem);
+                plannerItems.set(editId, { ...plannerItems.get(editId), ...newPlannerItem });
+            } else {
+                const docRef = await plannerCollection().add(newPlannerItem);
+                plannerItems.set(docRef.id, { ...newPlannerItem, id: docRef.id });
+            }
+        }
+        
+        hideAddItemModal();
+        renderHomePage();
+        renderTrackPage();
+        renderCategoriesPage(); // NEW
+
+    } catch (error) {
+        console.error("Error saving item: ", error);
+        alert("Failed to save item.");
+    } finally {
+        saveAddItemBtn.disabled = false;
+    }
+}
+
+
+// --- DELETED MODAL FUNCTIONS ---
+// showTimeRangeModal, hideTimeRangeModal, handleTimeRangeSelect
+// showFilterModal, hideFilterModal, applyFiltersAndClose
+// handleFilterTypeToggle, switchFilterTab, populateFilterLists
+// --- ALL DELETED ---
+
+// --- Export to CSV (MODIFIED) ---
+function exportToCSV() {
+    if (analysisLogs.length === 0) {
+        alert("No data to export for this period.");
+        return;
+    }
+    let csvContent = "data:text/csv;charset=utf-8,";
+    const headers = ["Item", "Category", "Type", "Notes", "Date", "Start Time", "End Time", "Duration (Hours)"];
+    csvContent += headers.join(",") + "\r\n";
+    const sortedLogs = [...analysisLogs].sort((a, b) => a.startTime - b.startTime);
+    sortedLogs.forEach(log => {
+        let itemName, categoryName, itemType;
+        
+        if (log.timerType === 'task') {
+            const task = plannerItems.get(log.activityId);
+            itemName = task?.name || log.activityName;
+            categoryName = "Task";
+            itemType = "Task";
+        } else {
+            const activity = activities.get(log.activityId);
+            itemName = activity?.name || log.activityName;
+            const category = categories.get(activity?.categoryId);
+            categoryName = category?.name || "Uncategorized";
+            itemType = "Activity";
+        }
+        
+        const notes = log.notes || "";
+        const start = new Date(log.startTime);
+        const end = new Date(log.endTime);
+        const date = start.toLocaleDateString('en-CA'); 
+        const startTime = start.toLocaleTimeString('en-GB'); 
+        const endTime = end.toLocaleTimeString('en-GB'); 
+        const durationHours = (log.durationMs / 3600000).toFixed(4);
+        
+        const row = [
+            `"${itemName.replace(/"/g, '""')}"`,
+            `"${categoryName.replace(/"/g, '""')}"`, 
+            `"${itemType.replace(/"/g, '""')}"`, 
+            `"${notes.replace(/"/g, '""')}"`,
+            date,
+            startTime,
+            endTime,
+            durationHours
+        ];
+        csvContent += row.join(",") + "\r\n";
+    });
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `time-tracker-export-${getTodayString()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
