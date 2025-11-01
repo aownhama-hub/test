@@ -18,8 +18,13 @@
     <!-- Link to external CSS -->
     <link rel="stylesheet" href="style.css">
 
-    <!-- Link to external JS, defer ensures it runs after HTML parsing -->
-    <script src="script.js" defer></script>
+    <!-- 
+      MODIFICATION: Replaced old script.js with the new 3-file structure.
+      The order is critical for the app to work.
+    -->
+    <script src="core.js" defer></script>
+    <script src="app-data.js" defer></script>
+    <script src="app-main.js" defer></script>
 
 </head>
 <body class="font-sans"> 
