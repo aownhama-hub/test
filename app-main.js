@@ -1,3 +1,12 @@
+// --- NEW V24: Date Formatter ---
+function formatDate(date) {
+    const d = new Date(date);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+}
+
 // --- NEW Home Page Rendering ---
 function renderHomePage() {
     if (!userId) {
@@ -323,7 +332,7 @@ function handleViewToggle() {
     } else {
         currentTrackView = 'list';
         trackViewIconList.classList.remove('hidden');
-        trackViewIconGrid.classList.add('hidden');
+        trackViewIconGrid.add('hidden');
     }
     renderTrackPage();
 }
@@ -711,7 +720,7 @@ async function handlePlannerItemCheck(id, isCompleted) {
     }
 }
 
-// NEW: Update time range state
+// MODIFIED: Update time range state and text
 function updateTimeRange(rangeType, customStart = null, customEnd = null) {
     currentTrackTimeRange.type = rangeType;
     const now = new Date();
@@ -753,23 +762,22 @@ function updateTimeRange(rangeType, customStart = null, customEnd = null) {
     currentTrackTimeRange.start = start;
     currentTrackTimeRange.end = end;
     
-    // Update button text
-    const options = { day: '2-digit', month: '2-digit', year: 'numeric' };
+    // --- NEW: Update button text logic ---
     if (rangeType === 'today') {
-        trackTimeRangeBtn.textContent = start.toLocaleDateString('en-GB', options);
+        trackTimeRangeBtn.textContent = formatDate(start); // DD/MM/YYYY
     } else if (rangeType === 'week') {
-        trackTimeRangeBtn.textContent = `${start.toLocaleDateString('en-GB', options)} - ${end.toLocaleDateString('en-GB', options)}`;
+        trackTimeRangeBtn.textContent = `${formatDate(start)} - ${formatDate(end)}`; // DD/MM/YYYY - DD/MM/YYYY
     } else if (rangeType === 'month') {
-        trackTimeRangeBtn.textContent = start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        trackTimeRangeBtn.textContent = `${String(start.getMonth() + 1).padStart(2, '0')}/${start.getFullYear()}`; // MM/YYYY
     } else if (rangeType === 'year') {
-        trackTimeRangeBtn.textContent = start.getFullYear().toString();
+        trackTimeRangeBtn.textContent = start.getFullYear().toString(); // YYYY
     } else if (rangeType === 'all') {
         trackTimeRangeBtn.textContent = 'All Time';
     } else if (rangeType === 'custom') {
         if (start.getTime() === end.getTime()) {
-            trackTimeRangeBtn.textContent = start.toLocaleDateString('en-GB', options);
+            trackTimeRangeBtn.textContent = formatDate(start); // DD/MM/YYYY
         } else {
-            trackTimeRangeBtn.textContent = `${start.toLocaleDateString('en-GB', options)} - ${end.toLocaleDateString('en-GB', options)}`;
+            trackTimeRangeBtn.textContent = `${formatDate(start)} - ${formatDate(end)}`; // DD/MM/YYYY - DD/MM/YYYY
         }
     }
 }
@@ -1043,3 +1051,4 @@ function hideFlipClock() {
         }
     }, 200); 
 }
+
