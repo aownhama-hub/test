@@ -1164,5 +1164,3 @@ function exportToCSV() {
     document.body.removeChild(link);
 }
 
-}
-
