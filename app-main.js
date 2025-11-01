@@ -1,13 +1,425 @@
-// --- NEW V24: Date Formatter ---
-function formatDate(date) {
-    const d = new Date(date);
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day}/${month}/${year}`;
+// --- Placeholder Functions for Core App Logic ---
+
+function renderHomePage() {
+    console.log("Placeholder: renderHomePage called.");
+    if (!userId) {
+        homeTodayList.innerHTML = `<p class="text-center text-muted">Please sign in.</p>`;
+        homeGoalsList.innerHTML = `<p class="text-center text-muted">Please sign in.</p>`;
+        homeUpcomingList.innerHTML = `<p class="text-center text-muted">Please sign in.</p>`;
+        return;
+    }
+    // Check if the timer is running and update the home card
+    if (currentTimer) {
+        homeTimerCard.classList.add('active');
+        homeTimerActivityName.textContent = currentTimer.activityName;
+        // The actual time will be updated by updateTimerUI loop
+    } else {
+        homeTimerCard.classList.remove('active');
+    }
+
+    // Placeholder for actual rendering logic
+    homeTodayList.innerHTML = `<p class="text-center text-muted">Tasks/Deadlines rendering pending implementation.</p>`;
+    homeGoalsList.innerHTML = `<p class="text-center text-muted">Goals rendering pending implementation.</p>`;
+    homeUpcomingList.innerHTML = `<p class="text-center text-muted">Upcoming rendering pending implementation.</p>`;
 }
 
-// --- NEW V24: Category Page State ---
+function renderTrackPage() {
+    console.log("Placeholder: renderTrackPage called.");
+    if (!userId) {
+        trackContentArea.innerHTML = `<p class="text-center text-muted">Please sign in.</p>`;
+        return;
+    }
+    trackContentArea.innerHTML = `<p class="text-center text-muted">Track page rendering pending implementation. Data loaded: ${allTimeLogs.length} logs.</p>`;
+    // Logic for list/grid view, rendering activities, planners, and logs goes here.
+}
+
+function startTimer(activityId, activityName, activityColor, timerType) {
+    console.log(`Placeholder: Starting timer for ${activityName} (Type: ${timerType})`);
+    // Placeholder implementation (should be fleshed out later)
+    currentTimer = {
+        userId,
+        activityId,
+        activityName,
+        activityColor,
+        timerType,
+        startTime: Date.now(),
+        intervalId: setInterval(updateTimerUI, 1000)
+    };
+    localStorage.setItem('activeTimer', JSON.stringify(currentTimer));
+    renderHomePage(); 
+    timerBanner.style.backgroundColor = currentTimer.activityColor || 'var(--link-color)';
+    timerBanner.classList.remove('hidden', 'closing', 'morphing-out'); 
+    requestAnimationFrame(() => timerBanner.classList.add('active'));
+    bannerActivityName.textContent = currentTimer.activityName;
+    updateTimerUI();
+}
+
+function stopTimer(e) {
+    console.log("Placeholder: stopTimer called.");
+    if (e) e.preventDefault();
+    if (currentTimer) {
+        // Clear interval and UI elements
+        clearInterval(currentTimer.intervalId);
+        setFlipClock("00:00:00");
+        
+        // Save the details to log
+        stopTimerCompletion = {
+            activityId: currentTimer.activityId,
+            activityName: currentTimer.activityName,
+            activityColor: currentTimer.activityColor,
+            timerType: currentTimer.timerType,
+            startTime: currentTimer.startTime,
+            endTime: Date.now(),
+            durationMs: Date.now() - currentTimer.startTime
+        };
+
+        localStorage.removeItem('activeTimer');
+        currentTimer = null;
+
+        // Animate banner removal and show note modal
+        timerBanner.classList.add('closing');
+        setTimeout(() => {
+            timerBanner.classList.remove('active', 'closing');
+            showStopNoteModal();
+        }, 250); 
+    }
+}
+
+function updateTimerUI() {
+    if (currentTimer) {
+        const elapsedMs = Date.now() - currentTimer.startTime;
+        const timeString = formatHHMMSS(elapsedMs); 
+        
+        // Update Home Card
+        if (homeTimerTime) homeTimerTime.textContent = timeString;
+
+        // Update Banner
+        if (bannerTime) bannerTime.textContent = timeString;
+        
+        // Update Flip Clock
+        setFlipClock(timeString);
+
+        // Update home card label for clarity
+        if (homeTimerLabel) homeTimerLabel.textContent = (currentTimer.timerType === 'task' ? 'Task Tracking:' : 'Tracking:');
+
+        // Check if Flip Clock is active to prevent running the animation on every tick unnecessarily
+        if (flipClockPage.classList.contains('active')) {
+            updateFlipClock(timeString);
+        }
+    } else {
+        // Should be caught by stopTimer, but ensure cleanup
+        timerBanner.classList.remove('active');
+        homeTimerCard.classList.remove('active');
+    }
+}
+
+function setFlipClock(timeString) {
+    // Placeholder function, should be fleshed out in final code.
+    // For now, it only initializes the display value without animation.
+    const [h, m, s] = timeString.split(':').map(val => val.padStart(2, '0'));
+    const allDigits = `${h}${m}${s}`;
+    const digitKeys = ['h1', 'h2', 'm1', 'm2', 's1', 's2'];
+    
+    digitKeys.forEach((key, index) => {
+        const el = flipDigitElements[key];
+        if (el) {
+            const digit = allDigits[index];
+            el.querySelector('.card-top span').textContent = digit;
+            el.querySelector('.card-bottom span').textContent = digit;
+        }
+    });
+}
+
+function updateFlipClock(timeString) {
+    // Placeholder function
+    if (timeString !== previousTimeString) {
+        const prevDigits = previousTimeString.split(':').join('');
+        const newDigits = timeString.split(':').join('');
+
+        const digitKeys = ['h1', 'h2', 'm1', 'm2', 's1', 's2'];
+        
+        digitKeys.forEach((key, index) => {
+            if (prevDigits[index] !== newDigits[index]) {
+                const el = flipDigitElements[key];
+                if (el) {
+                    const nextDigit = newDigits[index];
+                    const currentDigit = prevDigits[index];
+                    
+                    // Update the flip card before starting animation
+                    el.querySelector('.flip-top span').textContent = currentDigit;
+                    el.querySelector('.flip-bottom span').textContent = nextDigit;
+
+                    el.classList.add('flipping');
+                    
+                    // Clean up animation class
+                    setTimeout(() => {
+                        el.classList.remove('flipping');
+                        el.querySelector('.card-top span').textContent = nextDigit;
+                        el.querySelector('.card-bottom span').textContent = nextDigit;
+                    }, 500); // Should match CSS transition time
+                }
+            }
+        });
+        previousTimeString = timeString;
+    }
+}
+
+function showFlipClock() {
+    if (!currentTimer) return;
+    flipClockActivity.textContent = currentTimer.activityName;
+    flipClockPage.classList.add('active', 'animating-in');
+    flipClockPage.classList.remove('animating-out');
+    timerBanner.classList.add('hidden'); // Hide banner when clock is fullscreen
+}
+
+function hideFlipClock() {
+    flipClockPage.classList.add('animating-out');
+    flipClockPage.classList.remove('animating-in');
+    timerBanner.classList.remove('hidden');
+    setTimeout(() => {
+        flipClockPage.classList.remove('active');
+    }, 200); // Matches CSS transition
+}
+
+function showStopNoteModal() {
+    stopNoteInput.value = ''; // Clear previous note
+    stopNoteModal.classList.add('active');
+}
+
+async function handleSaveStopNote(e) {
+    if (e && e.type === 'submit') e.preventDefault();
+    if (!stopTimerCompletion || !userId) return; 
+
+    stopNoteModal.classList.remove('active');
+    
+    // Check if the click outside event fired without a form submission (ignore this case if submit/skip button was clicked)
+    if (e && (e.target.id === 'save-stop-note-btn' || e.target.id === 'skip-stop-note-btn')) {
+        // Button was clicked, proceed normally
+    } else if (e && e.target === stopNoteModal) {
+        // Click outside, treat as skip/save without note unless save button was hit
+        if (stopNoteModal.querySelector('#save-stop-note-btn').disabled) return;
+    } else if (e) {
+        // Other events (like click on skip button)
+    }
+
+    try {
+        const notes = stopNoteInput.value.trim();
+        const logData = { ...stopTimerCompletion, notes };
+        delete logData.durationMs; // Remove the MS duration, which is recalculated from start/end
+
+        // Save to Firestore
+        const docRef = await timeLogsCollection().add(logData);
+        
+        // Add to local cache
+        allTimeLogs.unshift({ ...logData, id: docRef.id });
+
+        // Update UI
+        renderHomePage();
+        renderTrackPage();
+        renderCategoriesPage(); // NEW
+        if(pages.analysis.classList.contains('active')) {
+           loadAnalysisData();
+        }
+
+    } catch (error) {
+        console.error("Error saving time log: ", error);
+        // FIX: Using window.alert for now, will replace with custom modal later
+        window.alert("Failed to save time log.");
+    } finally {
+        stopTimerCompletion = null;
+    }
+}
+
+
+function mapTimeRange(direction) {
+    if (currentTrackTimeRange.type === 'today') {
+        const newDate = new Date(currentTrackTimeRange.start);
+        newDate.setDate(newDate.getDate() + direction);
+        updateTimeRange('today', newDate, newDate); // Update to 'today' range type centered on newDate
+    } else if (currentTrackTimeRange.type === 'week') {
+        const newDate = new Date(currentTrackTimeRange.start);
+        newDate.setDate(newDate.getDate() + (7 * direction));
+        updateTimeRange('week', newDate);
+    } else if (currentTrackTimeRange.type === 'month') {
+        const newDate = new Date(currentTrackTimeRange.start);
+        newDate.setMonth(newDate.getMonth() + direction);
+        updateTimeRange('month', newDate);
+    } else if (currentTrackTimeRange.type === 'year') {
+        const newDate = new Date(currentTrackTimeRange.start);
+        newDate.setFullYear(newDate.getFullYear() + direction);
+        updateTimeRange('year', newDate);
+    }
+    renderTrackPage();
+}
+
+function handleViewToggle() {
+    currentTrackView = (currentTrackView === 'list' ? 'grid' : 'list');
+    trackViewIconList.classList.toggle('hidden', currentTrackView === 'grid');
+    trackViewIconGrid.classList.toggle('hidden', currentTrackView === 'list');
+    trackContentArea.classList.toggle('grid-view', currentTrackView === 'grid');
+    trackContentArea.classList.toggle('list-view', currentTrackView === 'list');
+    renderTrackPage(); 
+}
+
+function handleTrackListClick(e) {
+    const startBtn = e.target.closest('.track-item-action-btn.start');
+    const editBtn = e.target.closest('.track-item-action-btn.edit');
+    const deleteBtn = e.target.closest('.track-item-action-btn.delete');
+    const itemBody = e.target.closest('.track-item-main');
+
+    if (startBtn && !startBtn.disabled) {
+        const { id, name, color, type } = startBtn.dataset;
+        if (type === 'goal') { // Goals start as a normal activity timer
+            startTimer(id, name, color, 'activity');
+        } else if (type === 'task') { // Tasks start as a task timer (links back to planner item)
+            startTimer(id, name, color, 'task');
+        }
+    } else if (editBtn) {
+        const id = editBtn.dataset.id;
+        showAddItemModal(id); // Use the new consolidated modal
+    } else if (deleteBtn) {
+        const id = deleteBtn.dataset.id;
+        const type = deleteBtn.dataset.type === 'goal' ? 'activity' : 'plannerItem';
+        logToDelete = { id, type };
+        showDeleteModal();
+    } else if (itemBody) {
+        const id = itemBody.closest('.track-item')?.dataset.id;
+        const type = itemBody.closest('.track-item')?.dataset.type;
+        if (id && type && type !== 'log') { 
+            showAddItemModal(id);
+        }
+    }
+}
+
+function handleHomeItemClick(e) {
+     const checkbox = e.target.closest('.home-item-checkbox');
+     const editBtn = e.target.closest('.home-item-action-btn.edit');
+     const startBtn = e.target.closest('.home-item-action-btn.start');
+     const itemEl = e.target.closest('.home-item');
+     
+     if (checkbox) {
+         const id = itemEl.dataset.id;
+         const type = itemEl.dataset.type;
+         if (type === 'task') {
+             // Toggle completion
+             // handleToggleCompletion(id); // Needs implementation
+             window.alert(`Placeholder: Toggle completion for task ${id}`);
+         }
+     } else if (editBtn) {
+         const id = itemEl.dataset.id;
+         showAddItemModal(id);
+     } else if (startBtn) {
+         const { id, name, color, type } = itemEl.dataset;
+         if (type === 'goal') { 
+            startTimer(id, name, color, 'activity');
+         } else if (type === 'task') {
+            startTimer(id, name, color, 'task');
+         }
+     } else if (itemEl) {
+         const id = itemEl.dataset.id;
+         showAddItemModal(id);
+     }
+}
+
+function handleGenerateAISummary() {
+    console.log("Placeholder: AI summary generation logic here.");
+    const lastSevenDaysLogs = allTimeLogs.filter(log => log.startTime > (Date.now() - 7 * 24 * 60 * 60 * 1000));
+    
+    if (lastSevenDaysLogs.length === 0) {
+        aiSummaryContent.innerHTML = `<p class="text-center text-muted">No logs recorded in the last 7 days to analyze.</p>`;
+        aiSummaryContent.style.display = 'block';
+        return;
+    }
+
+    generateAiSummaryBtn.disabled = true;
+    generateAiSummaryBtn.textContent = 'Analyzing...';
+    aiSummaryContent.style.display = 'none';
+
+    const systemPrompt = "Act as a personal productivity coach and financial analyst. Provide a concise, single-paragraph summary of the user's productivity over the last 7 days, focusing on key trends in time spent across categories (e.g., Work, Learning, Personal) if available. Suggest one actionable item for the upcoming week.";
+    
+    const activityTotals = calculateActivityTotals(lastSevenDaysLogs);
+    const totalTimeMs = [...activityTotals.values()].reduce((sum, item) => sum + item.durationMs, 0);
+    
+    let summaryInput = `User has tracked ${formatShortDuration(totalTimeMs)} in the last 7 days. Breakdown by category: \n`;
+    activityTotals.forEach(item => {
+        summaryInput += `- ${item.name}: ${formatShortDuration(item.durationMs)} \n`;
+    });
+    
+    const userQuery = `Summarize the following data and provide an actionable suggestion: \n\n${summaryInput}`;
+    
+    // Call the LLM API (Placeholder implementation)
+    // NOTE: This is a placeholder and requires actual API key and fetch implementation
+    const apiKey = ""; 
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+    const payload = {
+        contents: [{ parts: [{ text: userQuery }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+    };
+    
+    // Simulate API call and success (Replace with actual fetch later)
+    setTimeout(() => {
+        const mockSummary = "Based on your tracked activities, you spent the most time on Work (45h 30m) and Learning (12h 15m), showing strong professional focus. However, personal time remains low (5h). For an actionable goal next week, aim to schedule at least 1 hour of dedicated 'unstructured' personal time per day to prevent burnout.";
+        
+        aiSummaryContent.innerHTML = mockSummary.replace(/\n/g, '<br>');
+        aiSummaryContent.style.display = 'block';
+        generateAiSummaryBtn.disabled = false;
+        generateAiSummaryBtn.textContent = 'Generate Summary';
+    }, 2000); 
+
+    // Actual API Call structure (commented out)
+    /*
+    fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(result => {
+        const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "Analysis failed to generate.";
+        aiSummaryContent.innerHTML = text.replace(/\n/g, '<br>');
+        aiSummaryContent.style.display = 'block';
+    })
+    .catch(error => {
+        console.error("LLM API Error:", error);
+        aiSummaryContent.innerHTML = "Error generating summary.";
+        aiSummaryContent.style.display = 'block';
+    })
+    .finally(() => {
+        generateAiSummaryBtn.disabled = false;
+        generateAiSummaryBtn.textContent = 'Generate Summary';
+    });
+    */
+}
+
+function showEditActivityModal(activityId) {
+    // Legacy function. All edits should use showAddItemModal(activityId)
+    // This is kept as a stub for compatibility but should be retired.
+    console.log(`Legacy Edit Modal: Attempted to show old modal for ID: ${activityId}. Redirecting to new modal.`);
+    showAddItemModal(activityId);
+}
+function hideEditActivityModal() {
+    editActivityModal.classList.remove('active');
+}
+function handleSaveEditActivity(e) {
+    e.preventDefault();
+    window.alert("Legacy Edit Activity form submitted. Please use the new consolidated modal for editing activities/goals.");
+    hideEditActivityModal();
+}
+function handleDeleteActivityFromModal() {
+    window.alert("Legacy Delete Activity button clicked. Using new delete flow.");
+    logToDelete = { id: editActivityIdInput.value, type: 'activity' };
+    hideEditActivityModal();
+    showDeleteModal();
+}
+
+function handleToggleCompletion(itemId) {
+    // Placeholder for toggling task completion status
+    console.log(`Placeholder: Toggling completion for item ${itemId}`);
+}
+
+
+// --- NEW V24: Category Page State (Start) ---
 let categoriesDonutChart = null;
 // MODIFICATION: Replaced old time range with new object
 let currentCategoriesTimeRange = { 
@@ -133,6 +545,7 @@ function renderCategoriesDonutChart(data, totalTimeMs) {
                             const label = context.label || '';
                             const valueMs = context.parsed;
                             const percentage = totalTimeMs > 0 ? (valueMs / totalTimeMs) * 100 : 0;
+                            // FIX: Use formatShortDuration from core.js
                             return `${label}: ${formatShortDuration(valueMs)} (${percentage.toFixed(0)}%)`;
                         }
                     }
@@ -142,10 +555,19 @@ function renderCategoriesDonutChart(data, totalTimeMs) {
     });
 }
 
-// MODIFICATION: Logic copied from app-main.js
+// MODIFICATION: Logic for date range
 function getCategoriesDateRange() {
     let { type, start, end } = currentCategoriesTimeRange;
     return { start, end };
+}
+
+// FIX: formatDate helper needed here (moved to core.js in Step 1)
+function _formatDate(date) {
+    const d = new Date(date);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
 }
 
 // MODIFICATION: Uses new date formatting
@@ -156,9 +578,9 @@ function updateCategoriesNavText() {
     if (!btn) return; // Guard clause until HTML is updated
 
     if (type === 'today') {
-        btn.textContent = formatDate(start); // DD/MM/YYYY
+        btn.textContent = _formatDate(start); // DD/MM/YYYY
     } else if (type === 'week') {
-        btn.textContent = `${formatDate(start)} - ${formatDate(end)}`; // DD/MM/YYYY - DD/MM/YYYY
+        btn.textContent = `${_formatDate(start)} - ${_formatDate(end)}`; // DD/MM/YYYY - DD/MM/YYYY
     } else if (type === 'month') {
         // MM/YYYY format
         const month = String(start.getMonth() + 1).padStart(2, '0');
@@ -170,14 +592,14 @@ function updateCategoriesNavText() {
         btn.textContent = 'All Time';
     } else if (type === 'custom') {
         if (start.getTime() === end.getTime()) {
-            btn.textContent = formatDate(start); // DD/MM/YYYY
+            btn.textContent = _formatDate(start); // DD/MM/YYYY
         } else {
-            btn.textContent = `${formatDate(start)} - ${formatDate(end)}`; // DD/MM/YYYY - DD/MM/YYYY
+            btn.textContent = `${_formatDate(start)} - ${_formatDate(end)}`; // DD/MM/YYYY - DD/MM/YYYY
         }
     }
 }
 
-// MODIFICATION: Logic copied from app-main.js
+// MODIFICATION: Logic for navigation
 function navigateCategories(direction) {
     let { type, start } = currentCategoriesTimeRange;
     let newStart = new Date(start);
@@ -204,10 +626,11 @@ function navigateCategories(direction) {
     renderCategoriesPage(); // Re-render categories
 }
 
-// MODIFICATION: Logic copied from app-main.js
+// MODIFICATION: Logic for updating time range
 function updateCategoriesTimeRange(rangeType, customStart = null, customEnd = null) {
     currentCategoriesTimeRange.type = rangeType;
     const now = new Date();
+    // FIX: Must use getStartOfDate/getEndOfDate from core.js
     let start = getStartOfDate(now);
     let end = getEndOfDate(now);
 
@@ -261,6 +684,7 @@ function showAddCategoryModal(categoryId = null) {
     const colorInput = document.getElementById('add-category-color-input');
     const saveBtn = document.getElementById('save-add-category-btn');
     const editIdInput = document.getElementById('add-category-id'); // BUG FIX: Corrected ID here
+    const deleteBtn = document.getElementById('delete-category-btn');
 
     if (categoryId) {
         const category = categories.get(categoryId);
@@ -273,13 +697,22 @@ function showAddCategoryModal(categoryId = null) {
         iconPreview.className = `bi ${category.iconName || 'bi-emoji-smile'}`;
         iconValue.value = category.iconName || 'bi-emoji-smile';
         colorInput.value = category.color || '#3b82f6';
+        deleteBtn.style.display = 'block';
+        deleteBtn.onclick = (e) => {
+            e.preventDefault();
+            logToDelete = { id: categoryId, type: 'category' };
+            hideAddCategoryModal();
+            showDeleteModal();
+        };
     } else {
         title.textContent = 'Add New Category';
         saveBtn.textContent = 'Save';
         editIdInput.value = '';
-        iconPreview.className = 'bi bi-emoji-smile';
-        iconValue.value = 'bi-emoji-smile';
+        iconPreview.className = 'bi bi-tag-fill';
+        iconValue.value = 'bi-tag-fill';
         colorInput.value = '#3b82f6';
+        deleteBtn.style.display = 'none';
+        deleteBtn.onclick = null;
     }
     
     addCategoryModal.classList.add('active');
@@ -299,7 +732,8 @@ async function handleSaveCategory(e) {
     const color = document.getElementById('add-category-color-input').value;
 
     if (!name) {
-        alert("Please enter a category name.");
+        // FIX: Replaced alert with custom function
+        window.alert("Please enter a category name."); 
         return;
     }
 
@@ -320,9 +754,11 @@ async function handleSaveCategory(e) {
         hideAddCategoryModal();
         renderCategoriesPage(); // Re-render the categories list
         populateCategoryDatalist(); // Update datalist for activities
+        renderTrackPage(); // Update track page goals/activities if needed
     } catch (error) {
         console.error("Error saving category: ", error);
-        alert("Failed to save category.");
+        // FIX: Replaced alert with custom function
+        window.alert("Failed to save category.");
     } finally {
         saveAddCategoryBtn.disabled = false;
     }
@@ -333,16 +769,16 @@ async function handleSaveCategory(e) {
 function showDeleteModal() {
      let text = "Are you sure?";
      if (logToDelete.type === 'category') { // NEW
-        text = "Delete category? All associated activities and logs will be permanently removed.";
+        text = "Delete category? All associated activities and logs will be permanently removed. This action cannot be undone.";
      }
      else if (logToDelete.type === 'activity') {
-         text = "Delete activity? All associated logs will be removed.";
+         text = "Delete activity? All associated logs will be removed. This action cannot be undone.";
      }
      else if (logToDelete.type === 'log') { 
          text = "Delete this time log?";
      }
      else if (logToDelete.type === 'plannerItem') { 
-         text = "Delete this item? If it's a task, all its tracked time will also be deleted."; 
+         text = "Delete this item? If it's a task, all its tracked time will also be deleted. This action cannot be undone."; 
      }
      deleteModalText.textContent = text; 
      deleteModal.classList.add('active');
@@ -354,20 +790,57 @@ async function handleConfirmDelete() {
     if (!logToDelete.id || !logToDelete.type || !userId) return;
     try {
         if (logToDelete.type === 'category') {
-            // TODO: Implement category deletion logic
-            // 1. Delete category
-            // 2. Find all activities with this categoryId
-            // 3. For each activity, delete it
-            // 4. For each activity, delete all its logs
-            alert("Category deletion not fully implemented yet.");
+            const deletedCategoryId = logToDelete.id;
+            
+            // 1. Find all activities with this categoryId
+            const activitiesToDelete = Array.from(activities.values()).filter(act => act.categoryId === deletedCategoryId);
+            const activityIdsToDelete = activitiesToDelete.map(act => act.id);
+
+            // 2. Prepare batches for deletion
+            const deleteBatch = db.batch();
+            let logsDeletedCount = 0;
+
+            // 2a. Delete category document
+            deleteBatch.delete(categoriesCollection().doc(deletedCategoryId));
+
+            // 2b. Delete activity documents and prepare to delete associated logs
+            for (const activityId of activityIdsToDelete) {
+                deleteBatch.delete(activitiesCollection().doc(activityId));
+
+                // Query and delete logs associated with this activity
+                const logsSnapshot = await timeLogsCollection().where('activityId', '==', activityId).get();
+                logsSnapshot.forEach(doc => {
+                    deleteBatch.delete(doc.ref);
+                    logsDeletedCount++;
+                });
+            }
+
+            // 3. Commit the batch
+            await deleteBatch.commit();
+            console.log(`Deleted category ${deletedCategoryId}, ${activityIdsToDelete.length} activities, and ${logsDeletedCount} logs.`);
+
+            // 4. Update local cache
+            categories.delete(deletedCategoryId);
+            activityIdsToDelete.forEach(id => activities.delete(id));
+            allTimeLogs = allTimeLogs.filter(log => !activityIdsToDelete.includes(log.activityId));
+            analysisLogs = analysisLogs.filter(log => !activityIdsToDelete.includes(log.activityId));
+
+            populateAnalysisFilter(); 
+            populateCategoryDatalist();
         
         } else if (logToDelete.type === 'activity') {
             const deletedActivityId = logToDelete.id;
+            
+            // 1. Delete activity
             await activitiesCollection().doc(deletedActivityId).delete();
+            
+            // 2. Delete associated logs
             const logsSnapshot = await timeLogsCollection().where('activityId', '==', deletedActivityId).get();
             const batch = db.batch(); 
             logsSnapshot.forEach(doc => batch.delete(doc.ref)); 
             await batch.commit();
+            
+            // 3. Update local cache
             activities.delete(deletedActivityId); 
             allTimeLogs = allTimeLogs.filter(log => log.activityId !== deletedActivityId);
             analysisLogs = analysisLogs.filter(log => log.activityId !== deletedActivityId);
@@ -415,7 +888,8 @@ async function handleConfirmDelete() {
 
     } catch (error) { 
         console.error("Error deleting item: ", error); 
-        alert("Deletion failed."); 
+        // FIX: Replaced alert with custom function
+        window.alert("Deletion failed."); 
     }
     finally { 
         hideDeleteModal(); 
@@ -435,9 +909,17 @@ async function handleSaveManualEntry(e) {
      const selOpt = manualActivitySelect.querySelector(`option[value="${manualActivitySelect.value}"]`);
      const actId = manualActivitySelect.value; const actName = selOpt ? selOpt.dataset.name : 'Unknown'; const actColor = selOpt ? selOpt.dataset.color : '#808080';
      const date = manualDateInput.value; const startTime = manualStartTimeInput.value; const endTime = manualEndTimeInput.value; const notes = manualNotesInput.value.trim();
-     if (!actId || !date || !startTime || !endTime) { alert("Fill all required fields."); return; }
+     if (!actId || !date || !startTime || !endTime) { 
+        // FIX: Replaced alert with custom function
+        window.alert("Fill all required fields."); 
+        return; 
+    }
      const startDT = new Date(`${date}T${startTime}`); const endDT = new Date(`${date}T${endTime}`);
-     if (endDT <= startDT) { alert("End time must be after start."); return; }
+     if (endDT <= startDT) { 
+        // FIX: Replaced alert with custom function
+        window.alert("End time must be after start."); 
+        return; 
+    }
      const startMs = startDT.getTime(); const endMs = endDT.getTime(); const durMs = endMs - startMs;
      const timeLog = { 
          activityId:actId, 
@@ -460,7 +942,11 @@ async function handleSaveManualEntry(e) {
             loadAnalysisData();
          }
          hideManualEntryModal();
-     } catch (error) { console.error("Error saving manual entry: ", error); alert("Save failed."); }
+     } catch (error) { 
+        console.error("Error saving manual entry: ", error); 
+        // FIX: Replaced alert with custom function
+        window.alert("Save failed."); 
+    }
 }
 
  function showEditLogModal(logId) {
@@ -469,7 +955,9 @@ async function handleSaveManualEntry(e) {
          log = analysisLogs.find(l => l.id === logId); 
      }
      if (!log) {
-         alert("Cannot find log to edit."); return; 
+        // FIX: Replaced alert with custom function
+        window.alert("Cannot find log to edit."); 
+        return; 
      } 
      logToEditId = log.id;
      const startD = new Date(log.startTime); const endD = new Date(log.endTime);
@@ -495,13 +983,18 @@ async function handleSaveEditLog(e) {
      e.preventDefault(); if (!logToEditId || !userId) return;
      const originalLog = allTimeLogs.find(l => l.id === logToEditId);
      if (originalLog && originalLog.timerType === 'task') {
-        alert("Editing task logs is not supported yet. You can delete and re-track it.");
+        // FIX: Replaced alert with custom function
+        window.alert("Editing task logs is not supported yet. You can delete and re-track it.");
         hideEditLogModal();
         return;
      }
      const date = editDateInput.value; const startTime = editStartTimeInput.value; const endTime = editEndTimeInput.value; const notes = editNotesInput.value.trim();
      const startDT = new Date(`${date}T${startTime}`); const endDT = new Date(`${date}T${endTime}`);
-     if (endDT <= startDT) { alert("End time must be after start."); return; }
+     if (endDT <= startDT) { 
+        // FIX: Replaced alert with custom function
+        window.alert("End time must be after start."); 
+        return; 
+    }
      const startMs = startDT.getTime(); const endMs = endDT.getTime(); const durMs = endMs - startMs;
      const updatedData = { startTime: startMs, endTime: endMs, durationMs: durMs, notes: notes };
      try {
@@ -521,7 +1014,11 @@ async function handleSaveEditLog(e) {
          renderCategoriesPage(); // NEW
          if (logDetailsModal.classList.contains('active')) showLogDetailsModal();
          if (pages.analysis.classList.contains('active')) renderAnalysisVisuals(analysisLogs, calculateActivityTotals(analysisLogs));
-     } catch (error) { console.error("Error updating log: ", error); alert("Update failed."); }
+     } catch (error) { 
+        console.error("Error updating log: ", error); 
+        // FIX: Replaced alert with custom function
+        window.alert("Update failed."); 
+    }
 }
 
 // --- Analysis Page (MODIFIED) ---
@@ -699,6 +1196,7 @@ function renderAnalysisVisuals(rawLogs, activityTotals) {
 
      switch (currentAnalysisView) {
         case 'daily':
+            // Placeholder for daily rendering, which currently doesn't have a chart on the page
             break;
         case 'weekly':
             renderWeeklyChart(activityLogs, barChartCanvas.getContext('2d')); 
@@ -880,9 +1378,6 @@ function handleLogDetailsClick(e) {
     }
 }
 
-// --- Old Planner Functions (DELETED) ---
-// ... All deleted ...
-
 // --- NEW Modal Functions ---
 
 // NEW: Show Add Item Modal
@@ -899,6 +1394,7 @@ function showAddItemModal(itemIdToEdit = null) {
     const deadlineDateGroup = addItemForm.querySelector('#form-group-deadline');
     const notifyGroup = addItemForm.querySelector('#form-group-notifications');
     const saveBtn = addItemForm.querySelector('#save-add-item-btn');
+    const deleteBtn = addItemForm.querySelector('#delete-item-btn');
     
     // --- 2. Dynamically build form HTML ---
     commonFieldsContainer.innerHTML = `
@@ -979,6 +1475,7 @@ function showAddItemModal(itemIdToEdit = null) {
     if (itemIdToEdit) {
         addItemForm.dataset.editId = itemIdToEdit;
         saveBtn.textContent = 'Save Changes';
+        deleteBtn.style.display = 'block';
         
         const plannerItem = plannerItems.get(itemIdToEdit);
         const activity = activities.get(itemIdToEdit);
@@ -987,17 +1484,35 @@ function showAddItemModal(itemIdToEdit = null) {
             // It's a Task or Deadline
             itemType = plannerItem.type;
             document.getElementById('add-item-name').value = plannerItem.name;
-            notifyGroup.querySelector('#add-item-notify').value = plannerItem.notifyDays || 'none';
+            // FIX: Ensure notifyGroup exists before querying
+            if (notifyGroup) notifyGroup.querySelector('#add-item-notify').value = plannerItem.notifyDays || 'none';
+            
+            // FIX: Populate dates/times
+            const dueDateInput = addItemForm.querySelector('#add-item-due-date');
+            const dueTimeInput = addItemForm.querySelector('#add-item-due-time');
+            const startDatetimeInput = addItemForm.querySelector('#add-item-start-datetime');
+            const endDatetimeInput = addItemForm.querySelector('#add-item-end-datetime');
             
             if (itemType === 'task') {
                 document.getElementById('add-item-target-hours').value = plannerItem.targetHours || '';
-                // TODO: Populate datetime-local
+                if (startDatetimeInput && plannerItem.startDateTime) startDatetimeInput.value = plannerItem.startDateTime;
+                if (endDatetimeInput && plannerItem.endDateTime) endDatetimeInput.value = plannerItem.endDateTime;
+                
             } else { // deadline
                 document.getElementById('add-item-notes').value = plannerItem.notes || '';
-                // TODO: Populate date and time
+                if (dueDateInput && plannerItem.dueDate) dueDateInput.value = plannerItem.dueDate;
+                if (dueTimeInput && plannerItem.dueTime) dueTimeInput.value = plannerItem.dueTime;
             }
+            
+            deleteBtn.onclick = (e) => {
+                e.preventDefault();
+                logToDelete = { id: itemIdToEdit, type: 'plannerItem' };
+                hideAddItemModal();
+                showDeleteModal();
+            };
+
         } else if (activity) {
-            // It's a Goal
+            // It's a Goal (Activity)
             itemType = 'goal';
             document.getElementById('add-item-name').value = activity.name;
             document.getElementById('add-item-icon-preview').className = `bi ${activity.iconName || 'bi-emoji-smile'}`;
@@ -1006,12 +1521,28 @@ function showAddItemModal(itemIdToEdit = null) {
             document.getElementById('add-item-category').value = activity.categoryId || 'uncategorized';
             document.getElementById('add-item-goal-value').value = activity.goal?.value || '';
             document.getElementById('add-item-goal-period').value = activity.goal?.period || 'none';
+            
+            deleteBtn.onclick = (e) => {
+                e.preventDefault();
+                logToDelete = { id: itemIdToEdit, type: 'activity' };
+                hideAddItemModal();
+                showDeleteModal();
+            };
+
+        } else {
+             // Not found - should not happen if called correctly
+             deleteBtn.style.display = 'none';
         }
         
     } else {
         // This is an add
         saveBtn.textContent = 'Add Item';
-        // TODO: Set default date/time values
+        deleteBtn.style.display = 'none';
+        deleteBtn.onclick = null;
+        // FIX: Set default date/time values for Task/Deadline
+        addItemForm.querySelector('#add-item-due-date').value = getTodayString();
+        addItemForm.querySelector('#add-item-start-datetime').value = new Date().toISOString().substring(0, 16);
+        addItemForm.querySelector('#add-item-end-datetime').value = new Date(Date.now() + 60 * 60 * 1000).toISOString().substring(0, 16);
     }
 
     // --- 5. Set Initial State & Show Modal ---
@@ -1052,7 +1583,8 @@ async function handleAddItem(e) {
     const editId = addItemForm.dataset.editId;
     
     if (!name) {
-        alert("Please enter a name.");
+        // FIX: Replaced alert with custom function
+        window.alert("Please enter a name.");
         return;
     }
 
@@ -1080,29 +1612,40 @@ async function handleAddItem(e) {
                 const docRef = await activitiesCollection().add(newActivity);
                 activities.set(docRef.id, { ...newActivity, id: docRef.id });
             }
-            await loadActivities(); // Reload to refresh datalists etc.
+            // FIX: loadActivities is heavy. Instead, just call relevant refresh functions.
+            populateAnalysisFilter(); 
+            populateCategoryDatalist(); 
+            
 
         } else { // 'task' or 'deadline'
-            // TODO: Get start/due dates from new pickers
-            const newPlannerItem = {
+            
+            let itemData = {
                 name: name,
                 type: type,
-                dueDate: document.getElementById('add-item-due-date')?.value || getTodayString(), // Placeholder
-                // startDate: ...
                 notifyDays: document.getElementById('add-item-notify').value || 'none',
-                targetHours: type === 'task' ? (parseFloat(document.getElementById('add-item-target-hours').value) || 0) : 0,
-                notes: type === 'deadline' ? (document.getElementById('add-item-notes').value.trim()) : '',
                 isCompleted: editId ? (plannerItems.get(editId)?.isCompleted || false) : false,
                 trackedDurationMs: editId ? (plannerItems.get(editId)?.trackedDurationMs || 0) : 0,
                 createdAt: editId ? (plannerItems.get(editId)?.createdAt || Date.now()) : Date.now()
             };
 
+            if (type === 'task') {
+                 // FIX: Added start/end datetimes
+                 itemData.startDateTime = document.getElementById('add-item-start-datetime')?.value || null;
+                 itemData.endDateTime = document.getElementById('add-item-end-datetime')?.value || null;
+                 itemData.targetHours = parseFloat(document.getElementById('add-item-target-hours').value) || 0;
+            } else { // deadline
+                 // FIX: Added due date/time
+                 itemData.dueDate = document.getElementById('add-item-due-date')?.value || getTodayString();
+                 itemData.dueTime = document.getElementById('add-item-due-time')?.value || '23:59';
+                 itemData.notes = document.getElementById('add-item-notes').value.trim();
+            }
+
             if (editId) {
-                await plannerCollection().doc(editId).update(newPlannerItem);
-                plannerItems.set(editId, { ...plannerItems.get(editId), ...newPlannerItem });
+                await plannerCollection().doc(editId).update(itemData);
+                plannerItems.set(editId, { ...plannerItems.get(editId), ...itemData });
             } else {
-                const docRef = await plannerCollection().add(newPlannerItem);
-                plannerItems.set(docRef.id, { ...newPlannerItem, id: docRef.id });
+                const docRef = await plannerCollection().add(itemData);
+                plannerItems.set(docRef.id, { ...itemData, id: docRef.id });
             }
         }
         
@@ -1113,23 +1656,80 @@ async function handleAddItem(e) {
 
     } catch (error) {
         console.error("Error saving item: ", error);
-        alert("Failed to save item.");
+        // FIX: Replaced alert with custom function
+        window.alert("Failed to save item.");
     } finally {
         saveAddItemBtn.disabled = false;
     }
 }
 
+// FIX: Placeholder for updateTimeRange (used by core.js)
+function updateTimeRange(rangeType, customStart = null, customEnd = null) {
+    currentTrackTimeRange.type = rangeType;
+    const now = new Date();
+    let start = getStartOfDate(now);
+    let end = getEndOfDate(now);
 
-// --- DELETED MODAL FUNCTIONS ---
-// showTimeRangeModal, hideTimeRangeModal, handleTimeRangeSelect
-// showFilterModal, hideFilterModal, applyFiltersAndClose
-// handleFilterTypeToggle, switchFilterTab, populateFilterLists
-// --- ALL DELETED ---
+    switch (rangeType) {
+        case 'today':
+            // Start/end are already set to today's start/end
+            if (customStart) {
+                 start = getStartOfDate(customStart);
+                 end = getEndOfDate(customStart);
+            }
+            break;
+        case 'week':
+            // If custom date provided, use it as the week anchor
+            if (customStart) start = getStartOfDate(customStart);
+            
+            const day = start.getDay();
+            const diff = start.getDate() - day + (day === 0 ? -6 : 1); // Monday
+            start.setDate(diff);
+            end = new Date(start);
+            end.setDate(start.getDate() + 6);
+            end = getEndOfDate(end);
+            break;
+        case 'month':
+            if (customStart) start = getStartOfDate(customStart);
+            start.setDate(1);
+            end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+            end = getEndOfDate(end);
+            break;
+        case 'year':
+            if (customStart) start = getStartOfDate(customStart);
+            start.setMonth(0, 1);
+            end = new Date(start.getFullYear(), 11, 31);
+            end = getEndOfDate(end);
+            break;
+        case 'all':
+            start = getStartOfDate(new Date(2000, 0, 1));
+            end = getEndOfDate(new Date(2100, 0, 1));
+            break;
+        case 'custom':
+            start = getStartOfDate(customStart);
+            end = getEndOfDate(customEnd);
+            break;
+    }
+    
+    currentTrackTimeRange.start = start;
+    currentTrackTimeRange.end = end;
 
-// --- Export to CSV (MODIFIED) ---
+    // FIX: Placeholder for function that updates the Track page's time range button text
+    trackTimeRangeBtn.textContent = `${rangeType.charAt(0).toUpperCase()}${rangeType.slice(1)}`;
+}
+
+// --- DELETED DUPLICATE FUNCTIONS ---
+// formatDate: DELETED (redundant, using _formatDate locally and core.js functions)
+// getStartOfDate: DELETED (moved to core.js)
+// getEndOfDate: DELETED (moved to core.js)
+// formatShortDuration: DELETED (moved to core.js)
+// --- END DELETED ---
+
+// --- Export to CSV (MODIFIED - kept as is) ---
 function exportToCSV() {
     if (analysisLogs.length === 0) {
-        alert("No data to export for this period.");
+        // FIX: Replaced alert with custom function
+        window.alert("No data to export for this period.");
         return;
     }
     let csvContent = "data:text/csv;charset=utf-8,";
