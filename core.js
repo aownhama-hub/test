@@ -107,8 +107,7 @@ const trackFilterBtn = document.getElementById('filter-btn');
 const trackContentArea = document.getElementById('track-content-area');
 
 // Categories page refs (NEW)
-// const addCategoryBtn = document.getElementById('add-category-btn'); // DELETED: Button removed from header
-// MODIFICATION: New element refs for Categories Header (will be added in Step 3)
+// MODIFICATION: New element refs for Categories Header 
 const categoriesTimeRangeBtn = document.getElementById('categories-time-range-btn');
 const categoriesNavPrev = document.getElementById('categories-nav-prev');
 const categoriesNavNext = document.getElementById('categories-nav-next');
@@ -243,6 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
     populateIconPicker(); // NEW
     // Set default time range
     updateTimeRange('today');
+    updateCategoriesTimeRange('month'); // Initialize categories range
 });
 
 // --- MODIFIED Event Listeners Setup ---
@@ -268,8 +268,7 @@ function setupEventListeners() {
     // trackFilterBtn.addEventListener('click', showFilterModal); // DELETED
     trackContentArea.addEventListener('click', handleTrackListClick);
 
-    // --- Universal Add Button ---
-    // MODIFICATION: Context-aware click listener
+    // --- Universal Add Button (Finalized Logic) ---
     universalAddBtn.addEventListener('click', () => {
         if (pages.categories.classList.contains('active')) {
             showAddCategoryModal();
@@ -303,7 +302,13 @@ function setupEventListeners() {
     viewAllLogsBtn.addEventListener('click', showLogDetailsModal);
     closeLogDetailsBtn.addEventListener('click', hideLogDetailsModal);
     logDetailsList.addEventListener('click', handleLogDetailsClick);
-
+    
+    // --- Categories Header Listeners (NEW) ---
+    categoriesTimeRangeBtn.addEventListener('click', () => console.log('Categories range picker needs implementation.')); // Placeholder
+    categoriesNavPrev.addEventListener('click', () => navigateCategories(-1));
+    categoriesNavNext.addEventListener('click', () => navigateCategories(1));
+    categoriesFilterBtn.addEventListener('click', () => console.log('Categories filter needs implementation.')); // Placeholder
+    
     // --- Edit Activity Listeners (Old, will be deprecated) ---
     cancelEditActivityBtn.addEventListener('click', hideEditActivityModal);
     editActivityForm.addEventListener('submit', handleSaveEditActivity);
@@ -337,7 +342,7 @@ function setupEventListeners() {
     addClickOutsideListener(deleteModal, hideDeleteModal);
     addClickOutsideListener(manualEntryModal, hideManualEntryModal);
     addClickOutsideListener(editLogModal, hideEditLogModal);
-    // BUG FIX: Removed this crashing line.
+    // BUG FIX: The crashing line is permanently removed here.
     // addClickOutsideListener(editActivityModal, hideEditActivityModal); 
     addClickOutsideListener(logDetailsModal, hideLogDetailsModal);
     addClickOutsideListener(emojiModal, hideEmojiPicker);
@@ -366,9 +371,6 @@ function setupEventListeners() {
     addClickOutsideListener(iconPickerModal, hideIconPicker);
     iconSearchInput.addEventListener('input', populateIconPicker);
     
-    // NEW: Categories Page Listeners
-    categoriesNavPrev.addEventListener('click', () => navigateCategories(-1));
-    categoriesNavNext.addEventListener('click', () => navigateCategories(1));
     categoriesListContainer.addEventListener('click', handleCategoriesListClick);
 }
 
@@ -668,7 +670,7 @@ function populateAnalysisFilter() {
 const EMOJI_CATEGORIES = [
     { name: 'Smileys', icon: '😀', emojis: ['😀', '😁', '😂', '🤣', '😃', '😄', '😅', '😆', '😉', '😊', '😋', '😎', '😍', '😘', '🥰', '😗', '😙', '🥲', '🤔', '🤫', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '😮‍💨', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '🥸', '🤓', '🧐', '😕', '😟', '🙁', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈', '👿', '💀', '💩', '🤡', '👹', '👺', '👻', '👽', '🤖', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾']},
     { name: 'People', icon: '👋', emojis: ['👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🫰', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦵', '🦶', '👂', '🦻', '👃', '🧠', '𫀀', '🦷', '🦴', '👀', '👁️', '👅', '👄', '👶', '🧒', '👦', '👧', '🧑', '👱', '👨', '👩', '🧓', '👴', '👵', '🙍', '🙎', '🙅', '🙆', '💁', '🙋', '🧏', '🙇', '🤦', '🤷', '🧑‍⚕️', '🧑‍🎓', '🧑‍🏫', '🧑‍⚖️', '🧑‍🌾', '🧑‍🍳', '🧑‍🔧', '🧑‍🏭', '🧑‍💼', '🧑‍🔬', '🧑‍💻', '🧑‍🎤', '🧑‍🎨', '🧑‍✈️', '🧑‍🚀', '🧑‍🚒', '👮', '🕵️', '💂', '🥷', '👷', '🤴', '👸', '👳', '👲', '🧕', '🤵', '👰', '🤰', '🤱', '👼', '🎅', '🦸', '🦹', '🧙', '🧚', '🧛', '🧜', '🧝', '🧞', '🧟', '💆', '💇', '🚶', '🧍', '🧎', '🧑‍🦽', '🧑‍🦼', '🏃', '💃', '🕺', '🕴️', '👯', '🧘', '🛀', '🛌', '🫂', '🗣️', '👤', '👥', '👣']},
-    { name: 'Food', icon: '🍎', emojis: ['🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶️', '🫑', '🌽', '🥕', '🫒', '🧄', '🧅', '🥔', '🍠', '🥐', '🥯', '🍞', '🥖', '🥨', '🧀', '🥚', '🍳', '🧈', '🥞', '🧇', '🥓', '🥩', '🍗', '🍖', '🦴', '🌭', '🍔', '🍟', '🍕', '𫓓', '🥪', '🥙', '🧆', '🌮', '🌯', '𫔔', '🥗', '🥘', '𫕕', '🥫', '🍝', '🍜', '🍲', '🍛', '🍣', '🍱', '🥟', '🦪', '🍤', '🍙', '🍚', '🍘', '🍥', '🥠', '🥮', '🍢', '🍡', '🍧', '🍨', '🍦', '🍰', '🧁', '🥧', '🍮', '🎂', '🍭', '🍬', '🍫', '🍿', '🍩', '🍪', '🌰', '🥜', '🍯', '🥛', '🍼', '☕', '𫖖', '🍵', '🍶', '🍾', '🍷', '🍸', '🍹', '🍺', '🍻', '🥂', '🥃', '🥤', '🧋', '🧃', '🧉', '🧊', '🥄', '🍴', '🔪', '🏺', '🌍', '🇪🇺', '🇺🇸', '🌏', '🇦🇺']},
+    { name: 'Food', icon: '🍎', emojis: ['🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶️', '𫖑', '🌽', '🥕', '𫒒', '🧄', '🧅', '🥔', '🍠', '🥐', '🥯', '🍞', '🥖', '🥨', '🧀', '🥚', '🍳', '🧈', '🥞', '🧇', '🥓', '🥩', '🍗', '🍖', '🦴', '🌭', '🍔', '🍟', '🍕', '𫓓', '🥪', '🥙', '🧆', '🌮', '🌯', '𫔔', '🥗', '🥘', '𫕕', '🥫', '🍝', '🍜', '🍲', '🍛', '🍣', '🍱', '🥟', '🦪', '🍤', '🍙', '🍚', '🍘', '🍥', '🥠', '🥮', '🍢', '🍡', '🍧', '🍨', '🍦', '🍰', '🧁', '🥧', '🍮', '🎂', '🍭', '🍬', '🍫', '🍿', '🍩', '🍪', '🌰', '🥜', '🍯', '🥛', '🍼', '☕', '𫖖', '🍵', '🍶', '🍾', '🍷', '🍸', '🍹', '🍺', '🍻', '🥂', '🥃', '🥤', '🧋', '🧃', '🧉', '🧊', '🥄', '🍴', '🔪', '🏺', '🌍', '🇪🇺', '🇺🇸', '🌏', '🇦🇺']},
     { name: 'Activities', icon: '⚽', emojis: ['⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🪀', '🏓', '🏸', '🏒', '🏑', '🥍', '🏏', '🥅', '⛳', '🪁', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛷', '⛸️', '🥌', '🎿', '⛷️', '🏂', '🪂', '🏋️', '🤸', '⛹️', '🤺', '🤾', '🏌️', '🏇', '🧘', '🏄', '🏊', '🤽', '🚣', '🧗', '🚵', '🚴', '🏆', '🥇', '🥈', '🥉', '🏅', '🎗️', '🎫', '🎪', '🤹', '🎭', '🩰', '🎨', '🎬', '🎤', '🎧', '🎼', '🎹', '🥁', '🎷', '🎺', '🎸', '🪕', '🎻', '🎲', '♟️', '🎯', '🎱', '🎮', '🎰', '🧩']},
     { name: 'Travel', icon: '🚗', emojis: ['🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🛻', '🚚', '🚛', '🚜', '🚔', '🚍', '🏍️', '🛵', '🦽', '🦼', '🛺', '🚲', '🛴', '🛹', '🛼', '🚏', '🛣️', '🛤️', '🛢️', '⛽', '🛞', '🚨', '🚥', '🚦', '🛑', '🚧', '⚓', '⛵', '🛶', '🚤', '🛳️', '⛴️', '🛥️', '🚢', '✈️', '🛩️', '🛫', '🛬', '🪂', '💺', '🚁', '🚠', '🚞', '🚊', '🚝', '🚄', '🚅', '🚈', '🚂', '🚆', '🚇', '🚉', '🛸', '🚀', '🛰️', '🪐', '🌠', '🌌', '⛱️', '🎆', '🎇', '🎑', '🗾', '🗺️', '🌍', '🌎', '🌏', '🌐', '🧭', '🏔️', '⛰️', '🌋', '🗻', '🏕️', '🏖️', '🏜️', '🏝️', '🏞️', '🏟️', '🏛️', '🏗️', '🏘️', '🏚️', '🏠', '🏡', '🏢', '🏣', '🏤', '🏥', '🏦', '🏨', '🏪', '🏫', '🏬', '🏭', '🏯', '🏰', '💒', '🗼', '🗽', '⛪', '🕌', '🛕', '🕍', '🕋', '⛲', '⛺', '🌁', '🌃', '🏙️', '🌄', '🌅', '🌆', '🌇', '🌉', '♨️', '🎠', '🎡', '🎢', '💈', '🛎️', '🧳', '⌛', '⏳', '⌚', '⏰', '⏱️', '⏲️', '🕰️', '🌡️', '☀️', '☁️', '⛅', '⛈️', '🌤️', '🌥️', '🌦️', '🌧️', '🌨️', '🌩️', '🌪️', '🌫️', '🌬️', '🌀', '🌈', '🌂', '☂️', '☔', '⚡', '❄️', '☃️', '⛄', '☄️', '🔥', '💧', '🌊']},
     { name: 'Objects', icon: '⌚', emojis: ['⌚', '📱', '💻', '⌨️', '🖥️', '🖨️', '🖱️', '🖲️', '🕹️', '🗜️', '⚙️', '🔧', '🔨', '⚒️', '⛏️', '🔩', '🧱', '🪨', '🪵', '🛖', '🛞', '⚖️', '🦯', '🔗', '⛓️', '🪝', '🧰', '🧲', '🪜', '⚗️', '🧪', '🧫', '🧬', '🔬', '🔭', '📡', '💉', '🩸', '💊', '🩹', '🩺', '🚪', '🛗', '🪞', '🪟', '🛏️', '🛋️', '🪑', '🚽', '🪠', '🚿', '🛁', '🪤', '🪒', '🧴', '🧷', '🧹', '🧺', '🧻', '🪣', '🧼', '🪥', '🧽', '🧯', '🛒', '🚬', '⚰️', '🪦', '⚱️', '🗿', '🪧', '🔮', '🪄', '📿', '💎', '💍', '💄', '💋', '💌', '💘', '💝', '💖', '💗', '💓', '💞', '💕', '💟', '❣️', '💔', '💯', '💢', '💣', '😵', '🤯', '💬', '👁️‍🗨️', '🗨️', '🗯️', '💭', '💤', '💮', '💈', '👓', '🕶️', '🥽', '🥼', '🦺', '👔', '👕', '👖', '🧣', '🧤', '🧥', '🧦', '👗', '👘', '🥻', '🩱', '🩲', '🩳', '👙', '👚', '👛', '👜', '👝', '🎒', '🩴', '👞', '👟', '🥾', '🥿', '👠', '👡', '🩰', '👢', '👑', '👒', '🎩', '🎓', '🧢', '🪖', '⛑️', '🔇', '🔈', '🔉', '🔊', '📢', '📣', '📯', '🔔', '🔕', '🎼', '🎵', '🎶', '💹', '📇', '📈', '📉', '📊', '📋', '📌', '📍', '📎', '🖇️', '📏', '📐', '✂️', '🗃️', '🗂️', '🗑️', '🔒', '🔓', '🔏', '🔐', '🔑', '🗝️', '🔨', '🪓', '⛏️', '⚒️', '🛠️', '🗡️', '⚔️', '🔫', '🪃', '🏹', '🛡️', '🪚', '🔧', '🔩', '🗜️', '⚖️', '🦯', '🔗', '⛓️', '🪝', '🧰', '🧲', '🪜', '⚗️', '🧪', '🧫', '🧬', '🔬', '🔭', '📡', '💉', '🩸', '💊', '🩹', '🩺', '🚪', '🛗', '🪞', '🪟', '🛏️', '🛋️', '🪑', '🚽', '🪠', '🚿', '🛁', '🪤', '🪒', '🧴', '🧷', '🧹', '🧺', '🧻', '🪣', '🧼', '🪥', '🧽', '🧯', '🛒', '🚬', '⚰️', '🪦', '⚱️', '🗿', '🪧', '🎄', '🎆', '🎇', '🧨', '✨', '🎈', '🎉', '🎊', '🎋', '🎍', '🎎', '🎏', '🎐', '🎑', '🧧', '🎀', '🎁']},
@@ -678,7 +680,7 @@ function populateEmojiPicker() {
     emojiCategories.innerHTML = '';
     EMOJI_CATEGORIES.forEach((category, index) => {
         const isActive = index === 0;
-        emojiCategories.innerHTML += `<button class="emoji-category-btn ${isActive ? 'active' : ''}" data-category="${category.name}" title="${category.name}">${category.icon}</button>`;
+        emojiCategories.innerHTML += `<button class="emoji-category-btn ${isActive ? 'active' : ''}" data-category="${category.name}" title="${category.icon}">${category.icon}</button>`;
     });
     loadEmojiCategory(EMOJI_CATEGORIES[0].name);
 }
@@ -879,11 +881,25 @@ function formatShortDuration(ms) {
 // --- NEW V24 Categories Page Navigation ---
 function navigateCategories(direction) {
     const d = currentCategoriesTimeRange.date;
-    if (currentCategoriesTimeRange.type === 'month') {
+    
+    // We update the state in app-data.js first, then trigger render
+    if (currentCategoriesTimeRange.type === 'today') {
+        // Need to switch type for navigation if using 'today'
+        const newStart = new Date(currentCategoriesTimeRange.start);
+        newStart.setDate(newStart.getDate() + direction);
+        updateCategoriesTimeRange('custom', newStart, newStart);
+    } else if (currentCategoriesTimeRange.type === 'week') {
+        const newStart = new Date(currentCategoriesTimeRange.start);
+        newStart.setDate(newStart.getDate() + (7 * direction));
+        updateCategoriesTimeRange('week', newStart);
+    } else if (currentCategoriesTimeRange.type === 'month') {
         d.setMonth(d.getMonth() + direction);
+        updateCategoriesTimeRange('month', d); // Pass date object
     } else if (currentCategoriesTimeRange.type === 'year') {
         d.setFullYear(d.getFullYear() + direction);
+        updateCategoriesTimeRange('year', d); // Pass date object
     }
+    
     renderCategoriesPage();
 }
 
