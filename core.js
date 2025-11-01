@@ -324,7 +324,7 @@ function setupEventListeners() {
     addClickOutsideListener(deleteModal, hideDeleteModal);
     addClickOutsideListener(manualEntryModal, hideManualEntryModal);
     addClickOutsideListener(editLogModal, hideEditLogModal);
-    addClickOutsideListener(editActivityModal, hideEditActivityModal);
+    // addClickOutsideListener(editActivityModal, hideEditActivityModal); // DELETED: This line caused the crash
     addClickOutsideListener(logDetailsModal, hideLogDetailsModal);
     addClickOutsideListener(emojiModal, hideEmojiPicker);
 
@@ -853,3 +853,4 @@ function formatShortDuration(ms) {
      let parts = []; if (h > 0) parts.push(`${h}h`); if (m > 0) parts.push(`${m}m`);
      if (h === 0 && m === 0) { if (secs > 0) parts.push(`${secs}s`); else return "0m"; } return parts.join(' ');
 }
+
