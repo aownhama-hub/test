@@ -1,8 +1,10 @@
 // --- NEW V24: Category Page State ---
 let categoriesDonutChart = null;
-let currentCategoriesTimeRange = {
-    type: 'month',
-    date: new Date() // The start of the month
+// MODIFICATION: Replaced old time range with new object
+let currentCategoriesTimeRange = { 
+    type: 'today', // 'today', 'week', 'month', 'year', 'all', 'custom'
+    start: getStartOfDate(new Date()), 
+    end: getEndOfDate(new Date()) 
 };
 
 // --- NEW V24: Render Categories Page ---
@@ -12,7 +14,7 @@ function renderCategoriesPage() {
         return;
     }
     
-    // 1. Set Date Navigator Text
+    // 1. Set Date Navigator Text (now uses new object)
     updateCategoriesNavText();
     
     // 2. Get logs for the current period
@@ -129,34 +131,106 @@ function renderCategoriesDonutChart(data, totalTimeMs) {
     });
 }
 
+// MODIFICATION: Logic copied from app-main.js
 function getCategoriesDateRange() {
-    const d = new Date(currentCategoriesTimeRange.date);
-    let start, end;
-    
-    if (currentCategoriesTimeRange.type === 'month') {
-        start = new Date(d.getFullYear(), d.getMonth(), 1);
-        end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-    } else if (currentCategoriesTimeRange.type === 'year') {
-        start = new Date(d.getFullYear(), 0, 1);
-        end = new Date(d.getFullYear(), 11, 31);
-    } else { // 'all'
-        start = new Date(2000, 0, 1);
-        end = new Date(2100, 0, 1);
-    }
-    
-    return { start: getStartOfDate(start), end: getEndOfDate(end) };
+    let { type, start, end } = currentCategoriesTimeRange;
+    return { start, end };
 }
 
+// MODIFICATION: Logic copied from app-main.js and uses new IDs
 function updateCategoriesNavText() {
-    const d = currentCategoriesTimeRange.date;
-    if (currentCategoriesTimeRange.type === 'month') {
-        categoriesNavText.textContent = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    } else if (currentCategoriesTimeRange.type === 'year') {
-        categoriesNavText.textContent = d.getFullYear().toString();
-    } else {
-        categoriesNavText.textContent = 'All Time';
+    const { type, start, end } = currentCategoriesTimeRange;
+    const btn = document.getElementById('categories-time-range-btn'); // Will be added in index.html
+    if (!btn) return; // Guard clause until HTML is updated
+
+    if (type === 'today') {
+        btn.textContent = formatDate(start); // DD/MM/YYYY
+    } else if (type === 'week') {
+        btn.textContent = `${formatDate(start)} - ${formatDate(end)}`; // DD/MM/YYYY - DD/MM/YYYY
+    } else if (type === 'month') {
+        btn.textContent = `${String(start.getMonth() + 1).padStart(2, '0')}/${start.getFullYear()}`; // MM/YYYY
+    } else if (type === 'year') {
+        btn.textContent = start.getFullYear().toString(); // YYYY
+    } else if (type === 'all') {
+        btn.textContent = 'All Time';
+    } else if (type === 'custom') {
+        if (start.getTime() === end.getTime()) {
+            btn.textContent = formatDate(start); // DD/MM/YYYY
+        } else {
+            btn.textContent = `${formatDate(start)} - ${formatDate(end)}`; // DD/MM/YYYY - DD/MM/YYYY
+        }
     }
 }
+
+// MODIFICATION: Logic copied from app-main.js
+function navigateCategories(direction) {
+    let { type, start } = currentCategoriesTimeRange;
+    let newStart = new Date(start);
+
+    if (type === 'today' || (type === 'custom' && currentCategoriesTimeRange.end.getTime() - start.getTime() <= 86400000)) {
+        newStart.setDate(newStart.getDate() + direction);
+        updateCategoriesTimeRange('custom', newStart, newStart);
+    } else if (type === 'week') {
+        newStart.setDate(newStart.getDate() + (7 * direction));
+        updateCategoriesTimeRange('week', newStart);
+    } else if (type === 'month') {
+        newStart.setDate(1); 
+        newStart.setMonth(newStart.getMonth() + direction);
+        updateCategoriesTimeRange('month', newStart);
+    } else if (type === 'year') {
+        newStart.setFullYear(newStart.getFullYear() + direction);
+        updateCategoriesTimeRange('year', newStart);
+    } else {
+        return; // Don't map for 'all'
+    }
+    
+    renderCategoriesPage(); // Re-render categories
+}
+
+// MODIFICATION: Logic copied from app-main.js
+function updateCategoriesTimeRange(rangeType, customStart = null, customEnd = null) {
+    currentCategoriesTimeRange.type = rangeType;
+    const now = new Date();
+    let start = getStartOfDate(now);
+    let end = getEndOfDate(now);
+
+    switch (rangeType) {
+        case 'today':
+            break;
+        case 'week':
+            const day = start.getDay();
+            const diff = start.getDate() - day + (day === 0 ? -6 : 1); // Monday
+            start.setDate(diff);
+            end = new Date(start);
+            end.setDate(start.getDate() + 6);
+            end = getEndOfDate(end);
+            break;
+        case 'month':
+            start.setDate(1);
+            end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+            end = getEndOfDate(end);
+            break;
+        case 'year':
+            start.setMonth(0, 1);
+            end = new Date(start.getFullYear(), 11, 31);
+            end = getEndOfDate(end);
+            break;
+        case 'all':
+            start = new Date(2000, 0, 1);
+            end = new Date(2100, 0, 1);
+            break;
+        case 'custom':
+            start = getStartOfDate(customStart);
+            end = getEndOfDate(customEnd);
+            break;
+    }
+    
+    currentCategoriesTimeRange.start = start;
+    currentCategoriesTimeRange.end = end;
+    
+    updateCategoriesNavText(); // Update the button text
+}
+
 
 // --- NEW V24: Category CRUD Modals ---
 function showAddCategoryModal(categoryId = null) {
@@ -166,10 +240,10 @@ function showAddCategoryModal(categoryId = null) {
     const title = document.getElementById('add-category-title');
     const nameInput = document.getElementById('add-category-name');
     const iconPreview = document.getElementById('add-category-icon-preview');
-    const iconValue = document.getElementById('add-category-icon-value');
+    const iconValue = document.getElementById('add-category-icon-name'); // BUG FIX: ID was wrong
     const colorInput = document.getElementById('add-category-color-input');
     const saveBtn = document.getElementById('save-add-category-btn');
-    const editIdInput = document.getElementById('edit-category-id');
+    const editIdInput = document.getElementById('add-category-id'); // BUG FIX: ID was wrong [cite: image_fbb2ca.png]
 
     if (categoryId) {
         const category = categories.get(categoryId);
@@ -202,9 +276,9 @@ async function handleSaveCategory(e) {
     e.preventDefault();
     if (!userId) return;
 
-    const editId = document.getElementById('edit-category-id').value;
+    const editId = document.getElementById('add-category-id').value; // BUG FIX: ID was wrong
     const name = document.getElementById('add-category-name').value.trim();
-    const iconName = document.getElementById('add-category-icon-value').value;
+    const iconName = document.getElementById('add-category-icon-name').value; // BUG FIX: ID was wrong
     const color = document.getElementById('add-category-color-input').value;
 
     if (!name) {
@@ -1089,3 +1163,6 @@ function exportToCSV() {
     link.click();
     document.body.removeChild(link);
 }
+
+}
+
